@@ -186,6 +186,40 @@ unikraft volume [command] [flags]
   ```
 </Accordion>
 
+<Accordion title="wait - Wait for volume state">
+  Wait for one or more volumes to match a filter expression.
+
+  ```bash
+  unikraft volume wait <name|uuid>... --until <filter> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--until <filter>" type="string" required>
+    Filter expression to wait for (e.g., `state==attached`)
+  </ParamField>
+
+  <ParamField path="--interval <duration>" type="duration" default="2s">
+    Polling interval for checking the condition
+  </ParamField>
+
+  <ParamField path="--timeout <duration>" type="duration" default="0">
+    Timeout before giving up (0 means no timeout)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Wait for a volume to be attached
+  unikraft volume wait my-volume --until state==attached
+  ```
+
+  ```bash
+  # Wait for a volume with custom timeout
+  unikraft volume wait my-volume --until state==detached --timeout 1m
+  ```
+</Accordion>
+
 ## Volume Mount Specification
 
 When attaching volumes to instances, use the format:

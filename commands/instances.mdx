@@ -310,6 +310,49 @@ unikraft instance [command] [flags]
   ```
 </Accordion>
 
+<Accordion title="wait - Wait for instance state">
+  Wait for one or more instances to match a filter expression.
+
+  ```bash
+  unikraft instance wait <name|uuid>... --until <filter> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--until <filter>" type="string" required>
+    Filter expression to wait for (e.g., `state==running`)
+  </ParamField>
+
+  <ParamField path="--interval <duration>" type="duration" default="2s">
+    Polling interval for checking the condition
+  </ParamField>
+
+  <ParamField path="--timeout <duration>" type="duration" default="0">
+    Timeout before giving up (0 means no timeout)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Wait for an instance to be running
+  unikraft instance wait my-instance --until state==running
+  ```
+
+  ```bash
+  # Wait for an instance with custom interval and timeout
+  unikraft instance wait my-instance --until state==running --interval 5s --timeout 2m
+  ```
+
+  ```bash
+  # Wait for multiple instances
+  unikraft instance wait instance-1 instance-2 --until state==stopped
+  ```
+
+  <Note>
+  The wait command polls the instance state at the specified interval and exits successfully when the condition is met. If a timeout is specified and the condition is not met within that time, the command will fail.
+  </Note>
+</Accordion>
+
 <Accordion title="start - Start instances">
   Start one or more stopped instances.
 

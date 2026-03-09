@@ -194,6 +194,40 @@ unikraft service [command] [flags]
   ```
 </Accordion>
 
+<Accordion title="wait - Wait for service state">
+  Wait for one or more service groups to match a filter expression.
+
+  ```bash
+  unikraft service wait <name|uuid>... --until <filter> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--until <filter>" type="string" required>
+    Filter expression to wait for (e.g., `persistent==true`)
+  </ParamField>
+
+  <ParamField path="--interval <duration>" type="duration" default="2s">
+    Polling interval for checking the condition
+  </ParamField>
+
+  <ParamField path="--timeout <duration>" type="duration" default="0">
+    Timeout before giving up (0 means no timeout)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Wait for a service group to become persistent
+  unikraft service wait my-service --until persistent==true
+  ```
+
+  ```bash
+  # Wait for a service with timeout
+  unikraft service wait my-service --until autoscale==true --timeout 30s
+  ```
+</Accordion>
+
 ## Service Port Specification
 
 Service port mappings use the format:

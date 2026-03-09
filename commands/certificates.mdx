@@ -145,6 +145,40 @@ unikraft certificate [command] [flags]
   ```
 </Accordion>
 
+<Accordion title="wait - Wait for certificate state">
+  Wait for one or more certificates to match a filter expression.
+
+  ```bash
+  unikraft certificate wait <name|uuid>... --until <filter> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--until <filter>" type="string" required>
+    Filter expression to wait for (e.g., `state==ready`)
+  </ParamField>
+
+  <ParamField path="--interval <duration>" type="duration" default="2s">
+    Polling interval for checking the condition
+  </ParamField>
+
+  <ParamField path="--timeout <duration>" type="duration" default="0">
+    Timeout before giving up (0 means no timeout)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Wait for a certificate to be ready
+  unikraft certificate wait my-cert --until state==ready
+  ```
+
+  ```bash
+  # Wait for certificate with timeout
+  unikraft certificate wait my-cert --until state==ready --timeout 1m
+  ```
+</Accordion>
+
 ## Certificate Requirements
 
 - Certificates must be in PEM format
