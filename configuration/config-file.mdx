@@ -1,0 +1,304 @@
+---
+title: Configuration File
+description: Learn how to configure the Unikraft CLI using the YAML configuration file
+---
+
+The Unikraft CLI stores its configuration in a YAML file that manages profiles, authentication tokens, and metro endpoints. This allows you to easily switch between different accounts and configurations.
+
+## Configuration File Location
+
+The default configuration file location varies by operating system:
+
+<Tabs>
+  <Tab title="Linux">
+    ```
+    ~/.config/unikraft/config.yaml
+    ```
+  </Tab>
+  <Tab title="macOS">
+    ```
+    ~/Library/Application Support/unikraft/config.yaml
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```
+    %APPDATA%\unikraft\config.yaml
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+You can override the default location using the `UNIKRAFT_CONFIG` environment variable:
+
+```bash
+export UNIKRAFT_CONFIG=/custom/path/to/config.yaml
+```
+</Tip>
+
+## Configuration Structure
+
+The configuration file uses YAML format with the following structure:
+
+```yaml
+profile: default
+profiles:
+  default:
+    type: cloud
+    organization: <org-name>
+    token: <api-token>
+    metros:
+      - name: <metro-name>
+        endpoint: <metro-endpoint>
+        country: <metro-country>
+        insecure: false
+```
+
+### Top-Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `profile` | string | The name of the currently active profile |
+| `profiles` | map | A map of named profile configurations |
+
+## Profile Configuration
+
+Each profile in the `profiles` map contains configuration for connecting to Unikraft Cloud or local environments.
+
+### Profile Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | Profile type: `cloud` or `local` (only `cloud` currently supported) |
+| `token` | string | Yes | Authentication token for Unikraft Cloud |
+| `organization` | string | No | Organization name associated with this profile |
+| `controlplane` | string | No | Control plane endpoint URL |
+| `metros` | array | No | List of metro configurations |
+
+<Note>
+Cloud profiles require a valid authentication token. You can obtain one using `unikraft login` or from the [Unikraft Cloud Console](https://console.unikraft.cloud).
+</Note>
+
+### Metro Configuration
+
+The `metros` array contains configurations for specific metro regions:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Metro identifier (e.g., `fra`, `sfo`, `sin`) |
+| `endpoint` | string | Yes | API endpoint URL for the metro |
+| `country` | string | Yes | ISO 3166-1 alpha-2 country code |
+| `insecure` | boolean | No | Skip TLS verification (not recommended for production) |
+
+## Example Configurations
+
+### Single Profile Configuration
+
+```yaml
+profile: default
+profiles:
+  default:
+    type: cloud
+    organization: my-org
+    token: uk_prod_abc123xyz789
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+      - name: sfo
+        endpoint: https://api.sfo.unikraft.cloud
+        country: us
+```
+
+### Multiple Profiles Configuration
+
+```yaml
+profile: production
+profiles:
+  production:
+    type: cloud
+    organization: acme-corp
+    token: uk_prod_token123
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+      - name: dal
+        endpoint: https://api.dal.unikraft.cloud
+        country: us
+  
+  staging:
+    type: cloud
+    organization: acme-staging
+    token: uk_staging_token456
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+  
+  development:
+    type: cloud
+    organization: acme-dev
+    token: uk_dev_token789
+    metros:
+      - name: sfo
+        endpoint: https://api.sfo.unikraft.cloud
+        country: us
+```
+
+### Development Configuration with Insecure Connection
+
+```yaml
+profile: local-dev
+profiles:
+  local-dev:
+    type: cloud
+    token: dev_token_12345
+    metros:
+      - name: local
+        endpoint: http://localhost:8080
+        country: local
+        insecure: true
+```
+
+<Warning>
+The `insecure: true` option disables TLS certificate verification. Only use this for local development environments. Never use this in production as it makes your connection vulnerable to man-in-the-middle attacks.
+</Warning>
+
+## Creating Configuration Manually
+
+While `unikraft login` automatically creates the configuration, you can also create it manually:
+
+1. Create the configuration directory:
+   ```bash
+   # Linux
+   mkdir -p ~/.config/unikraft
+   
+   # macOS
+   mkdir -p ~/Library/Application\ Support/unikraft
+   ```
+
+2. Create the configuration file with your preferred editor:
+   ```bash
+   # Linux
+   nano ~/.config/unikraft/config.yaml
+   
+   # macOS
+   nano ~/Library/Application\ Support/unikraft/config.yaml
+   ```
+
+3. Add your profile configuration following the structure above.
+
+## Managing Profiles
+
+The CLI provides commands to manage profiles without manually editing the configuration file:
+
+```bash
+# List all profiles
+unikraft profile list
+
+# Show current profile details
+unikraft profile get
+
+# Switch to a different profile
+unikraft profile use staging
+```
+
+<Tip>
+You can override the current profile for a single command using the `--profile` flag:
+
+```bash
+unikraft --profile=staging instances list
+```
+
+Alternatively, use the `UNIKRAFT_PROFILE` environment variable:
+
+```bash
+export UNIKRAFT_PROFILE=staging
+unikraft instances list
+```
+</Tip>
+
+## Configuration File Behavior
+
+### Merging and Preservation
+
+When the CLI updates the configuration file (e.g., during `unikraft login`), it:
+
+- **Preserves** comments in the existing file
+- **Merges** new values with existing configuration
+- **Removes** unknown/invalid keys from profiles
+- **Updates** modified fields while keeping unrelated sections intact
+
+Example:
+
+```yaml
+# This comment will be preserved
+profile: default
+profiles:
+  # Profile-specific comment also preserved
+  default:
+    type: cloud
+    token: updated-token  # Will be updated
+    # unknown-field will be removed
+```
+
+### Validation
+
+The CLI validates the configuration file on load:
+
+- Profile names must not be empty
+- Cloud profiles must have a valid token
+- Profile type must be `cloud` (local profiles not yet supported)
+- Metro configurations must have name, endpoint, and country fields
+
+<Note>
+If validation fails, the CLI will display an error message indicating which profile or field caused the issue. Fix the configuration file and try again.
+</Note>
+
+## Troubleshooting
+
+### Profile Not Found
+
+If you see an error like `profile "xyz" not found`:
+
+1. Check that the profile exists in your configuration file
+2. Verify the profile name matches exactly (case-sensitive)
+3. Use `unikraft profile list` to see all available profiles
+
+### Profile Not Setup
+
+If you see `profile not setup`, you need to authenticate:
+
+```bash
+unikraft login
+```
+
+This will create the default profile and authenticate you with Unikraft Cloud.
+
+### Invalid Token
+
+If authentication fails:
+
+1. Verify your token is still valid
+2. Re-authenticate using `unikraft login`
+3. Check that the token in the configuration file hasn't been truncated or modified
+
+### Permission Issues
+
+If you can't write to the configuration file:
+
+```bash
+# Fix permissions (Linux/macOS)
+chmod 600 ~/.config/unikraft/config.yaml
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="code" href="/configuration/environment-variables">
+    Learn about environment variables for runtime configuration
+  </Card>
+  <Card title="Shell Completion" icon="terminal" href="/configuration/shell-completion">
+    Set up tab completion for your shell
+  </Card>
+</CardGroup>

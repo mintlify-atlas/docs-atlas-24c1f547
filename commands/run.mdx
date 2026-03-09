@@ -1,0 +1,302 @@
+---
+title: unikraft run
+description: Deploy and run a new instance from an image
+---
+
+## Syntax
+
+```bash
+unikraft run [flags] IMAGE [ARGS...]
+```
+
+Deploy and run a new instance from a container image. The instance is created in the specified metro and can be configured with various resource allocations, networking options, and runtime settings.
+
+## Arguments
+
+<ParamField path="IMAGE" type="string" required>
+  The container image to run. Can be specified as a full image reference (e.g., `nginx:latest`, `my-registry.com/app:v1.0`).
+</ParamField>
+
+<ParamField path="ARGS" type="string[]">
+  Additional arguments to pass to the instance at runtime. These are passed to the application running inside the instance.
+</ParamField>
+
+## Flags
+
+### Basic Configuration
+
+<ParamField path="--metro" type="string" required>
+  Metro (data center location) to deploy the instance in. This flag is required.
+  
+  Example: `--metro=sfo`, `--metro=fra`
+</ParamField>
+
+<ParamField path="--name" type="string" short="n">
+  Name to assign to the instance. If not specified, a name will be automatically generated.
+  
+  Example: `--name=my-app-instance`
+</ParamField>
+
+<ParamField path="--env" type="string[]" short="e">
+  Set environment variables for the instance. Can be specified multiple times to set multiple variables.
+  
+  Format: `KEY=VALUE`
+  
+  Example: `--env=PORT=8080 --env=DEBUG=true`
+</ParamField>
+
+### Resource Allocation
+
+<ParamField path="--memory" type="size" short="m">
+  Memory allocation in IEC format (e.g., `128MiB`, `1GiB`, `1G`). Supports both binary (MiB, GiB) and decimal (MB, GB) units.
+  
+  Example: `--memory=512MiB`, `--memory=1GiB`
+</ParamField>
+
+<ParamField path="--vcpus" type="int">
+  Number of virtual CPUs to allocate to the instance.
+  
+  Example: `--vcpus=2`
+</ParamField>
+
+### Storage
+
+<ParamField path="--volume" type="string[]" short="v">
+  Attach a volume to the instance. Can be specified multiple times to attach multiple volumes.
+  
+  Format: 
+  - `NAME:AT[:ro]` - Attach existing volume by name
+  - `NAME:SIZE:AT[:ro]` - Create and attach new volume with specified size
+  - `UUID:AT[:ro]` - Attach existing volume by UUID
+  
+  Where:
+  - `NAME` is the volume name
+  - `SIZE` is the volume size (e.g., `10GiB`)
+  - `AT` is the mount point inside the instance
+  - `ro` (optional) makes the volume read-only
+  
+  Example: 
+  - `--volume=my-volume:/data`
+  - `--volume=my-volume:/data:ro`
+  - `--volume=cache-vol:5GiB:/cache`
+</ParamField>
+
+### Networking & Services
+
+<ParamField path="--service" type="string">
+  Service group name to associate with this instance. Can be a service name or UUID.
+  
+  Example: `--service=my-service-group`
+</ParamField>
+
+<ParamField path="--publish" type="string[]" short="p">
+  Publish a service port to expose the instance. Can be specified multiple times for multiple ports.
+  
+  Format: `SOURCE:DESTINATION[/HANDLERS]`
+  
+  Where:
+  - `SOURCE` is the external port
+  - `DESTINATION` is the internal port on the instance
+  - `HANDLERS` (optional) specifies protocol handlers
+  
+  Common handlers:
+  - `http` - HTTP protocol
+  - `http+tls` - HTTPS (HTTP with TLS)
+  - `http+redirect` - HTTP redirect to HTTPS
+  - `tls` - TLS passthrough
+  
+  Example: 
+  - `--publish=443:8080/http+tls`
+  - `--publish=80:443/http+redirect`
+  - `--publish=8080:8080/http`
+</ParamField>
+
+<ParamField path="--domain" type="string[]">
+  Add a custom domain (FQDN) to the service. Can be specified multiple times for multiple domains.
+  
+  Example: `--domain=app.example.com`
+</ParamField>
+
+### Lifecycle & Scaling
+
+<ParamField path="--autostart" type="bool" default="true">
+  Start the instance automatically after creation. Enabled by default.
+  
+  Example: `--autostart=false`
+</ParamField>
+
+<ParamField path="--restart" type="string">
+  Restart policy for the instance. Determines when the instance should be automatically restarted.
+  
+  Common values: `on-failure`, `always`, `never`
+  
+  Example: `--restart=on-failure`
+</ParamField>
+
+<ParamField path="--replicas" type="int">
+  Number of replicas to create. Deploy multiple identical instances.
+  
+  Example: `--replicas=3`
+</ParamField>
+
+<ParamField path="--scale-to-zero" type="string[]">
+  Enable scale-to-zero functionality for the instance. Allows the instance to automatically scale down to zero when idle.
+  
+  Format: Comma-separated key=value pairs
+  
+  Available options:
+  - `policy` - Scale-to-zero policy (`on` or `off`)
+  - `cooldown-time` - Cooldown time in seconds before scaling to zero
+  - `stateful` - Whether the instance is stateful
+  
+  Example: `--scale-to-zero=policy=on,cooldown-time=300`
+</ParamField>
+
+### Advanced Options
+
+<ParamField path="--features" type="string[]">
+  Enable specific instance features. Can be specified multiple times.
+  
+  Example: `--features=feature1 --features=feature2`
+</ParamField>
+
+<ParamField path="--dry-run" type="bool">
+  Show the create preview without actually executing the deployment. Useful for validating configuration before deployment.
+  
+  Example: `--dry-run`
+</ParamField>
+
+<ParamField path="--follow" type="bool">
+  Follow (tail) instance logs after creation. Automatically streams logs from the newly created instance.
+  
+  Example: `--follow`
+</ParamField>
+
+## Examples
+
+### Deploy with HTTPS Service
+
+Deploy a new instance and expose an HTTPS service:
+
+```bash
+unikraft run --metro=sfo -p 443:8080/http+tls nginx:latest
+```
+
+### HTTPS with HTTP Redirect
+
+Deploy a new instance with HTTPS and HTTP to HTTPS redirect:
+
+```bash
+unikraft run --metro=sfo -p 443:8080/http+tls -p 80:443/http+redirect nginx:latest
+```
+
+### Deploy and Follow Logs
+
+Deploy and tail logs from a new instance:
+
+```bash
+unikraft run --metro=fra --follow nginx:latest
+```
+
+### Preview Deployment (Dry Run)
+
+Preview instance creation without executing:
+
+```bash
+unikraft run --metro=dal --dry-run nginx:latest
+```
+
+<Note>
+The `--dry-run` flag displays what would be created without actually deploying the instance. This is useful for validating your configuration before committing to a deployment.
+</Note>
+
+### Deploy with Environment Variables
+
+Deploy a new instance with environment variables:
+
+```bash
+unikraft run --metro=was -e KEY1=VALUE1 -e KEY2=VALUE2 my-app:latest
+```
+
+### Deploy with Volume
+
+Deploy a new instance with an attached volume:
+
+```bash
+unikraft run --metro=sin -v my-volume:/data my-app:latest
+```
+
+### Deploy with Read-Only Volume
+
+Deploy a new instance with a read-only volume:
+
+```bash
+unikraft run --metro=sin -v my-volume:/data:ro my-app:latest
+```
+
+### Deploy with Custom Resources
+
+Deploy a new instance with custom memory and CPU allocations:
+
+```bash
+unikraft run --metro=sfo -m 512MiB --vcpus 2 my-app:latest
+```
+
+### Deploy with Scale-to-Zero
+
+Deploy a new instance with scale-to-zero enabled:
+
+```bash
+unikraft run --metro=fra --scale-to-zero policy=on,cooldown-time=300 my-app:latest
+```
+
+### Deploy with Restart Policy
+
+Deploy a new instance with a specific restart policy:
+
+```bash
+unikraft run --metro=dal --restart=on-failure my-app:latest
+```
+
+## Port Publishing Format
+
+The `--publish` flag uses the format `SOURCE:DESTINATION[/HANDLERS]`:
+
+- **SOURCE**: External port number that will be exposed
+- **DESTINATION**: Internal port number on the instance
+- **HANDLERS**: Optional protocol handlers (separated by `+`)
+
+Common handler combinations:
+- `http` - Plain HTTP
+- `http+tls` - HTTPS with TLS termination
+- `http+redirect` - HTTP redirect (typically from port 80 to 443)
+- `tls` - TLS passthrough without termination
+
+## Volume Format
+
+The `--volume` flag supports three formats:
+
+1. **Existing volume by name**: `NAME:AT[:ro]`
+   - Example: `my-volume:/data`
+
+2. **New volume with size**: `NAME:SIZE:AT[:ro]`
+   - Example: `cache:10GiB:/cache`
+
+3. **Existing volume by UUID**: `UUID:AT[:ro]`
+   - Example: `550e8400-e29b-41d4-a716-446655440000:/data`
+
+The `:ro` suffix makes the volume read-only within the instance.
+
+## Notes
+
+<Note>
+The `--metro` flag is required. You must specify which data center location to deploy your instance in.
+</Note>
+
+<Note>
+Instances are set to autostart by default (`--autostart=true`). Use `--autostart=false` if you want to create an instance without starting it immediately.
+</Note>
+
+<Note>
+When using `--follow`, the command will stream logs until interrupted (Ctrl+C). The instance will continue running after you stop following the logs.
+</Note>

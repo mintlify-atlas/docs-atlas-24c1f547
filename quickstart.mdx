@@ -1,80 +1,431 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Deploy your first unikernel instance with Unikraft Cloud in minutes
 ---
 
-## Get started in three steps
+This guide walks you through authenticating with Unikraft Cloud and deploying your first unikernel instance.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
+
+- [Installed the Unikraft CLI](/installation)
+- A [Unikraft Cloud account](https://console.unikraft.cloud/auth/signin)
+
+## Step 1: Authenticate with Unikraft Cloud
+
+<Steps>
+  <Step title="Login to Unikraft Cloud">
+    Run the login command to authenticate:
+
+    ```bash
+    unikraft login
+    ```
+
+    This command will:
+    1. Open your default browser automatically
+    2. Prompt you to authenticate via the Unikraft Cloud console
+    3. Wait for confirmation (default timeout: 5 minutes)
+
+    <Tip>
+    If your browser doesn't open automatically, copy and paste the URL shown in the terminal.
+    </Tip>
+  </Step>
+
+  <Step title="Verify authentication">
+    Once authenticated, you'll see a confirmation message:
+
+    ```
+    authenticated organization=<your-org-name>
+    login successful profile=<your-org-name>
+    ```
+
+    Check your authentication status anytime:
+
+    ```bash
+    unikraft login --check
+    ```
+  </Step>
+</Steps>
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="Alternative: Login with token file">
+    If you prefer to use a token file instead of browser authentication:
+
+    ```bash
+    unikraft login --token /path/to/token
+    ```
+
+    Or read from stdin:
+
+    ```bash
+    unikraft login --token -
+    ```
+
+    When using a token file, you must also specify your organization:
+
+    ```bash
+    unikraft login --token /path/to/token --organization my-org
+    ```
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+
+  <Accordion title="Alternative: Manual profile configuration">
+    For advanced use cases, you can manually create a profile:
+
+    ```yaml
+    # Linux: ~/.config/unikraft/config.yaml
+    # MacOS: ~/Library/Application Support/unikraft/config.yaml
+    profile: default
+    profiles:
+      default:
+        type: cloud
+        organization: <org-name>
+        token: <api-token>
+        metros:
+          - name: fra
+            endpoint: https://api.fra.unikraft.cloud
+            country: de
+            insecure: false
+    ```
+
+    <Warning>
+    Avoid setting `insecure: true` in production environments as it skips TLS verification.
+    </Warning>
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+## Step 2: List Available Metros
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+View all available deployment locations:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```bash
+unikraft metros list
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Example output:
 
-### Step 3: Go live
+```
+NAME  COUNTRY  ENDPOINT
+fra   de       https://api.fra.unikraft.cloud
+sfo   us       https://api.sfo.unikraft.cloud
+sin   sg       https://api.sin.unikraft.cloud
+was   us       https://api.was.unikraft.cloud
+dal   us       https://api.dal.unikraft.cloud
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+<Tip>
+Choose a metro closest to your users for the best performance. Use the metro `name` in deployment commands.
+</Tip>
 
-## Next steps
+## Step 3: Deploy Your First Instance
 
-Now that you have your docs running, explore these key features:
+Deploy an NGINX instance with HTTPS enabled:
 
-<CardGroup cols={2}>
+```bash
+unikraft run --metro=fra -p 443:8080/http+tls nginx:latest
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This command:
+- Deploys an NGINX unikernel in Frankfurt (`fra`)
+- Exposes port 8080 as HTTPS on port 443
+- Automatically provisions a TLS certificate
+- Starts the instance immediately
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The instance will boot in **milliseconds** and be ready to serve traffic.
+</Note>
+
+### Understanding the Run Command
+
+The `unikraft run` command accepts several options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--metro` | Deployment location (required) | `--metro=fra` |
+| `-p, --publish` | Expose service ports | `-p 443:8080/http+tls` |
+| `-e, --env` | Set environment variables | `-e KEY=VALUE` |
+| `-v, --volume` | Attach persistent volumes | `-v my-vol:/data` |
+| `-m, --memory` | Memory allocation | `-m 512MiB` |
+| `--vcpus` | Number of vCPUs | `--vcpus 2` |
+| `-n, --name` | Instance name | `-n my-app` |
+
+<Tip>
+For a complete list of options, run `unikraft run --help`.
+</Tip>
+
+## Step 4: Verify Your Deployment
+
+<Steps>
+  <Step title="List your instances">
+    View all running instances:
+
+    ```bash
+    unikraft instances list
+    ```
+
+    Example output:
+
+    ```
+    METRO  NAME                STATE    IMAGE          MEMORY   VCPUS  CREATED
+    fra    nginx-abc123        running  nginx:latest   128MiB   1      2s ago
+    ```
+  </Step>
+
+  <Step title="Get detailed instance information">
+    Inspect a specific instance:
+
+    ```bash
+    unikraft instances get <instance-name>
+    ```
+
+    This shows detailed information including:
+    - Service URLs and domains
+    - Resource allocation
+    - Runtime configuration
+    - Network details
+  </Step>
+
+  <Step title="View instance logs">
+    Monitor your instance logs in real-time:
+
+    ```bash
+    unikraft instances logs <instance-name> --follow
+    ```
+
+    Or fetch the last 100 lines:
+
+    ```bash
+    unikraft instances logs <instance-name> --tail 100
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Deploy with Advanced Features
+
+Now that you've deployed a basic instance, try these common deployment patterns:
+
+<CodeGroup>
+```bash Environment Variables
+unikraft run --metro=sfo \
+  -e DATABASE_URL=postgres://... \
+  -e ENVIRONMENT=production \
+  -e DEBUG=false \
+  my-app:latest
+```
+
+```bash Persistent Storage
+unikraft run --metro=was \
+  -v my-data-volume:/data \
+  -v logs-volume:/var/log \
+  my-app:latest
+```
+
+```bash Custom Resources
+unikraft run --metro=dal \
+  -m 512MiB \
+  --vcpus 2 \
+  my-app:latest
+```
+
+```bash Scale-to-Zero
+unikraft run --metro=sin \
+  --scale-to-zero policy=on,cooldown-time=300 \
+  my-app:latest
+```
+
+```bash HTTP with HTTPS Redirect
+unikraft run --metro=fra \
+  -p 443:8080/http+tls \
+  -p 80:443/http+redirect \
+  nginx:latest
+```
+</CodeGroup>
+
+### Working with Volumes
+
+Create a persistent volume before attaching it:
+
+<Steps>
+  <Step title="Create a volume">
+    ```bash
+    unikraft volumes create \
+      --set name=my-data \
+      --set metro=fra \
+      --set size=1024
+    ```
+  </Step>
+
+  <Step title="Deploy with the volume">
+    ```bash
+    unikraft run --metro=fra \
+      -v my-data:/data \
+      my-app:latest
+    ```
+  </Step>
+
+  <Step title="Attach as read-only">
+    ```bash
+    unikraft run --metro=fra \
+      -v my-data:/data:ro \
+      my-app:latest
+    ```
+  </Step>
+</Steps>
+
+## Managing Your Instances
+
+Common instance management operations:
+
+<CodeGroup>
+```bash Start Instance
+unikraft instances start <instance-name>
+```
+
+```bash Stop Instance
+unikraft instances stop <instance-name>
+```
+
+```bash Restart Instance
+unikraft instances restart <instance-name>
+```
+
+```bash Delete Instance
+unikraft instances delete <instance-name>
+```
+
+```bash Update Instance Image
+unikraft instances edit <instance-name> --set image=nginx:1.27
+```
+
+```bash Scale Memory
+unikraft instances edit <instance-name> --set resources.memory=256
+```
+</CodeGroup>
+
+<Warning>
+Deleting an instance is irreversible. Ensure you have backups of any important data stored in attached volumes.
+</Warning>
+
+## Using Multiple Profiles
+
+Switch between different organizations or configurations:
+
+<Steps>
+  <Step title="List profiles">
+    ```bash
+    unikraft profile list
+    ```
+  </Step>
+
+  <Step title="Switch active profile">
+    ```bash
+    unikraft profile use staging
+    ```
+  </Step>
+
+  <Step title="Use profile for single command">
+    ```bash
+    unikraft --profile=staging instances list
+    ```
+  </Step>
+</Steps>
+
+## Output Formats
+
+The CLI supports multiple output formats for automation and scripting:
+
+<CodeGroup>
+```bash Table (default)
+unikraft instances list
+```
+
+```bash JSON
+unikraft instances list -o json
+```
+
+```bash Specific Fields
+unikraft instances get my-instance --fields name,state,image
+```
+
+```bash Verbose Output
+unikraft instances get my-instance -v
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy a Service Group" icon="layer-group" href="/guides/service-groups">
+    Learn how to create load-balanced service groups
+  </Card>
+  <Card title="Manage Volumes" icon="database" href="/guides/managing-volumes">
+    Work with persistent storage for your instances
+  </Card>
+  <Card title="Configure Certificates" icon="certificate" href="/guides/tls-certificates">
+    Set up custom TLS certificates for your services
+  </Card>
+  <Card title="Command Reference" icon="terminal" href="/commands/run">
+    Explore all available commands and options
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Instance fails to start">
+    If your instance fails to start:
+    
+    1. Check the instance logs: `unikraft instances logs <instance-name>`
+    2. Verify the image exists and is compatible
+    3. Ensure sufficient resources are available in the metro
+    4. Check service port configurations are valid
+  </Accordion>
+
+  <Accordion title="Cannot connect to instance">
+    If you cannot reach your deployed instance:
+    
+    1. Verify the instance is in `running` state
+    2. Check service group and domain configuration
+    3. Ensure firewall rules allow traffic to the exposed ports
+    4. Verify TLS certificate provisioning completed successfully
+  </Accordion>
+
+  <Accordion title="Authentication expired">
+    If you receive authentication errors:
+    
+    1. Check your login status: `unikraft login --check`
+    2. Re-authenticate: `unikraft login`
+    3. Verify your organization membership hasn't changed
+  </Accordion>
+
+  <Accordion title="Volume attachment errors">
+    If volume attachment fails:
+    
+    1. Verify the volume exists in the same metro
+    2. Ensure the volume isn't already attached to another instance
+    3. Check the mount path is valid and doesn't conflict with system paths
+    4. Confirm volume size is sufficient
+  </Accordion>
+</AccordionGroup>
+
+## Environment Variables
+
+Customize CLI behavior with environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `UNIKRAFT_CONFIG` | Configuration file path | `~/.config/unikraft/config.yaml` |
+| `UNIKRAFT_PROFILE` | Override active profile | `production` |
+| `UNIKRAFT_LOG_LEVEL` | Log verbosity | `trace`, `debug`, `info`, `warn`, `error` |
+| `UNIKRAFT_LOG_TYPE` | Output format | `text`, `json` |
+| `UNIKRAFT_TELEMETRY` | Enable/disable telemetry | `true`, `false` |
+
+Example usage:
+
+```bash
+UNIKRAFT_LOG_LEVEL=debug unikraft instances list
+```
+
+<Note>
+The CLI collects anonymous usage analytics to improve the product. No personally identifiable information is collected. Opt out by setting `UNIKRAFT_TELEMETRY=false` or `DO_NOT_TRACK=1`.
 </Note>

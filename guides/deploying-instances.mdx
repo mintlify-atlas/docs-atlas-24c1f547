@@ -1,0 +1,565 @@
+---
+title: Deploying Instances
+description: Deploy and manage unikernel instances on Unikraft Cloud with the run command
+---
+
+The `unikraft run` command is the fastest way to deploy unikernel instances to Unikraft Cloud. This guide covers deployment scenarios from simple single-instance deployments to complex multi-region, auto-scaled configurations.
+
+## Quick Start
+
+Deploy your first instance:
+
+```bash
+unikraft run --metro fra nginx:latest
+```
+
+This deploys an NGINX unikernel in the Frankfurt metro with default settings.
+
+## Basic Deployment
+
+<Steps>
+  <Step title="Choose an image">
+    Select a unikernel image from the Unikraft Cloud registry:
+    ```bash
+    unikraft images list
+    ```
+  </Step>
+
+  <Step title="Select a metro">
+    Choose a deployment region:
+    ```bash
+    unikraft metros list
+    ```
+  </Step>
+
+  <Step title="Deploy the instance">
+    ```bash
+    unikraft run --metro fra nginx:latest
+    ```
+  </Step>
+
+  <Step title="Verify deployment">
+    ```bash
+    unikraft instances list
+    ```
+  </Step>
+</Steps>
+
+## Naming Instances
+
+Assign a custom name to your instance:
+
+```bash
+unikraft run --metro fra --name my-nginx nginx:latest
+```
+
+If no name is provided, the platform auto-generates one.
+
+## Resource Configuration
+
+### Memory Allocation
+
+Specify memory in IEC format (MiB, GiB, MB, GB):
+
+```bash
+# 512 MiB
+unikraft run --metro fra -m 512MiB nginx:latest
+
+# 1 GiB
+unikraft run --metro fra -m 1GiB nginx:latest
+
+# 2 GB (metric)
+unikraft run --metro fra -m 2GB nginx:latest
+```
+
+### CPU Allocation
+
+Set the number of virtual CPUs:
+
+```bash
+unikraft run --metro fra --vcpus 2 nginx:latest
+```
+
+### Combined Resource Settings
+
+<CodeGroup>
+```bash Development
+unikraft run --metro fra \
+  -m 256MiB \
+  --vcpus 1 \
+  nginx:latest
+```
+
+```bash Production
+unikraft run --metro fra \
+  -m 1GiB \
+  --vcpus 4 \
+  nginx:latest
+```
+
+```bash High-Performance
+unikraft run --metro fra \
+  -m 4GiB \
+  --vcpus 8 \
+  my-app:latest
+```
+</CodeGroup>
+
+## Environment Variables
+
+Pass environment variables to your instance:
+
+```bash
+unikraft run --metro fra \
+  -e DATABASE_URL=postgres://db.example.com \
+  -e DEBUG=true \
+  -e LOG_LEVEL=info \
+  my-app:latest
+```
+
+### Multiple Environment Variables
+
+```bash
+unikraft run --metro fra \
+  -e KEY1=VALUE1 \
+  -e KEY2=VALUE2 \
+  -e KEY3=VALUE3 \
+  my-app:latest
+```
+
+## Command Arguments
+
+Pass arguments to your instance's entrypoint:
+
+```bash
+# Simple arguments
+unikraft run --metro fra my-app:latest --arg1 --arg2 value
+
+# With flags
+unikraft run --metro fra redis:latest --port 6379 --maxmemory 256mb
+```
+
+## Network Configuration
+
+### Exposing Services
+
+Publish service ports with automatic HTTPS:
+
+```bash
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  nginx:latest
+```
+
+Format: `SOURCE:DESTINATION[/HANDLERS]`
+
+- **SOURCE**: External port (e.g., 443)
+- **DESTINATION**: Instance port (e.g., 8080)
+- **HANDLERS**: Protocol handlers (e.g., `http+tls`, `http`, `tcp`)
+
+### Multiple Service Ports
+
+<CodeGroup>
+```bash HTTPS with HTTP Redirect
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  -p 80:443/http+redirect \
+  nginx:latest
+```
+
+```bash HTTPS and Direct HTTP
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  -p 80:8080/http \
+  nginx:latest
+```
+
+```bash Custom Ports
+unikraft run --metro fra \
+  -p 8443:8080/http+tls \
+  -p 9000:9000/tcp \
+  my-app:latest
+```
+</CodeGroup>
+
+### Service Groups
+
+Deploy instances into an existing service group:
+
+```bash
+unikraft run --metro fra \
+  --service my-service-group \
+  nginx:latest
+```
+
+Or create a new service group during deployment:
+
+```bash
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  --domain my-app.example.com \
+  nginx:latest
+```
+
+### Custom Domains
+
+Assign custom domains to your instance:
+
+```bash
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  --domain app.example.com \
+  --domain www.example.com \
+  nginx:latest
+```
+
+## Volume Attachments
+
+### Attach Existing Volume
+
+```bash
+unikraft run --metro fra \
+  -v my-data:/data \
+  my-app:latest
+```
+
+Format: `NAME:MOUNTPOINT[:ro]`
+
+### Read-Only Volume
+
+```bash
+unikraft run --metro fra \
+  -v config-volume:/etc/config:ro \
+  my-app:latest
+```
+
+### Create and Attach Volume
+
+Create a new volume during deployment:
+
+```bash
+unikraft run --metro fra \
+  -v my-data:100MiB:/data \
+  my-app:latest
+```
+
+Format: `NAME:SIZE:MOUNTPOINT[:ro]`
+
+### Multiple Volumes
+
+```bash
+unikraft run --metro fra \
+  -v data-vol:/data \
+  -v cache-vol:/cache \
+  -v config-vol:/etc/config:ro \
+  my-app:latest
+```
+
+## Scale-to-Zero Configuration
+
+Enable automatic scaling to zero for cost optimization:
+
+```bash
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=300 \
+  my-app:latest
+```
+
+### Scale-to-Zero Options
+
+| Option | Description | Example |
+|--------|-------------|----------|
+| `policy` | Enable/disable scale-to-zero | `policy=on` or `policy=off` |
+| `cooldown-time` | Milliseconds before scaling to zero | `cooldown-time=300000` (5 min) |
+| `stateful` | Preserve instance state | `stateful=true` |
+
+### Advanced Scale-to-Zero
+
+<CodeGroup>
+```bash Quick Scale-Down
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=60000 \
+  my-app:latest
+```
+
+```bash Conservative Scale-Down
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=600000 \
+  my-app:latest
+```
+
+```bash Stateful Scale-to-Zero
+unikraft run --metro fra \
+  --scale-to-zero policy=on,stateful=true,cooldown-time=300000 \
+  my-app:latest
+```
+</CodeGroup>
+
+## Restart Policies
+
+Configure instance restart behavior:
+
+```bash
+# Always restart on failure
+unikraft run --metro fra \
+  --restart on-failure \
+  my-app:latest
+
+# Never restart
+unikraft run --metro fra \
+  --restart never \
+  my-app:latest
+```
+
+## Autostart Control
+
+Control whether the instance starts immediately:
+
+```bash
+# Start automatically (default)
+unikraft run --metro fra --autostart nginx:latest
+
+# Create but don't start
+unikraft run --metro fra --autostart=false nginx:latest
+```
+
+## Advanced Deployment Scenarios
+
+### Full-Stack Application
+
+<CodeGroup>
+```bash Web Server
+unikraft run --metro fra \
+  --name web-server \
+  -m 512MiB \
+  --vcpus 2 \
+  -p 443:8080/http+tls \
+  -p 80:443/http+redirect \
+  --domain myapp.com \
+  -e DATABASE_URL=postgres://db.internal:5432/myapp \
+  -e REDIS_URL=redis://cache.internal:6379 \
+  -v uploads:/uploads \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  web-app:v1.2.3
+```
+
+```bash API Service
+unikraft run --metro fra \
+  --name api-service \
+  -m 256MiB \
+  --vcpus 1 \
+  -p 443:3000/http+tls \
+  --service api-service-group \
+  -e JWT_SECRET=secret-key \
+  -e API_KEY=api-key \
+  --scale-to-zero policy=on,cooldown-time=60000 \
+  api:latest
+```
+
+```bash Background Worker
+unikraft run --metro fra \
+  --name worker \
+  -m 1GiB \
+  --vcpus 4 \
+  -e QUEUE_URL=amqp://queue.internal \
+  -e WORKER_THREADS=4 \
+  -v jobs-data:/data \
+  --restart on-failure \
+  worker:latest
+```
+</CodeGroup>
+
+### Microservices Architecture
+
+```bash
+# Frontend service
+unikraft run --metro fra \
+  --name frontend \
+  -p 443:3000/http+tls \
+  --domain app.example.com \
+  frontend:latest
+
+# API gateway
+unikraft run --metro fra \
+  --name api-gateway \
+  -p 443:8080/http+tls \
+  --domain api.example.com \
+  -e BACKEND_URL=http://backend.internal \
+  gateway:latest
+
+# Backend service
+unikraft run --metro fra \
+  --name backend \
+  -m 512MiB \
+  -e DATABASE_URL=postgres://db.internal/app \
+  backend:latest
+```
+
+## Dry Run Mode
+
+Preview deployment configuration without executing:
+
+```bash
+unikraft run --metro fra \
+  --name preview-instance \
+  -m 512MiB \
+  --vcpus 2 \
+  -p 443:8080/http+tls \
+  --dry-run \
+  nginx:latest
+```
+
+This displays the exact configuration that would be created.
+
+## Following Logs
+
+Stream logs immediately after deployment:
+
+```bash
+unikraft run --metro fra \
+  --follow \
+  nginx:latest
+```
+
+This combines deployment and log tailing in a single command.
+
+## Multi-Region Deployment
+
+Deploy across multiple metros for high availability:
+
+<Steps>
+  <Step title="Deploy to first region">
+    ```bash
+    unikraft run --metro fra \
+      --name my-app-fra \
+      -p 443:8080/http+tls \
+      my-app:latest
+    ```
+  </Step>
+
+  <Step title="Deploy to second region">
+    ```bash
+    unikraft run --metro sfo \
+      --name my-app-sfo \
+      -p 443:8080/http+tls \
+      my-app:latest
+    ```
+  </Step>
+
+  <Step title="Deploy to third region">
+    ```bash
+    unikraft run --metro sin \
+      --name my-app-sin \
+      -p 443:8080/http+tls \
+      my-app:latest
+    ```
+  </Step>
+</Steps>
+
+## Output Formats
+
+Customize deployment output:
+
+<CodeGroup>
+```bash Key-Value (Default)
+unikraft run --metro fra nginx:latest
+```
+
+```bash JSON
+unikraft run --metro fra -o json nginx:latest
+```
+
+```bash Specific Fields
+unikraft run --metro fra \
+  --fields name,state,image \
+  nginx:latest
+```
+</CodeGroup>
+
+## Troubleshooting
+
+### Deployment Failures
+
+If deployment fails:
+
+1. **Check image availability**:
+   ```bash
+   unikraft images list | grep nginx
+   ```
+
+2. **Verify metro is valid**:
+   ```bash
+   unikraft metros list
+   ```
+
+3. **Check quota and limits**:
+   ```bash
+   unikraft instances list
+   ```
+
+4. **Review error messages** and ensure all required flags are provided
+
+### Port Conflicts
+
+If ports are already in use:
+
+```bash
+# Check existing service groups
+unikraft services list
+
+# Use different ports or join existing service group
+unikraft run --metro fra \
+  --service existing-service \
+  nginx:latest
+```
+
+### Volume Attachment Issues
+
+Ensure volumes exist before attaching:
+
+```bash
+# List available volumes
+unikraft volumes list --metro fra
+
+# Create volume if needed
+unikraft volumes create \
+  --set name=my-data \
+  --set size=100MiB \
+  --set metro=fra
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="tag">
+    Name instances clearly to identify their purpose: `web-prod-fra`, `api-staging-sfo`.
+  </Card>
+
+  <Card title="Set Resource Limits" icon="gauge">
+    Always specify memory and CPU to prevent resource contention and unexpected costs.
+  </Card>
+
+  <Card title="Enable Scale-to-Zero" icon="chart-line-down">
+    Use scale-to-zero for non-production or intermittent workloads to optimize costs.
+  </Card>
+
+  <Card title="Use Environment Variables" icon="key">
+    Pass configuration via environment variables instead of hardcoding in images.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Manage Volumes" icon="database" href="/guides/managing-volumes">
+    Learn about persistent storage for your instances
+  </Card>
+
+  <Card title="Service Groups" icon="network-wired" href="/guides/service-groups">
+    Configure load balancing and service discovery
+  </Card>
+
+  <Card title="Scale-to-Zero" icon="chart-line-down" href="/guides/scale-to-zero">
+    Deep dive into scale-to-zero policies and optimization
+  </Card>
+</CardGroup>

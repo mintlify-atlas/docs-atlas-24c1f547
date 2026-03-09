@@ -1,0 +1,387 @@
+---
+title: Profile Management
+description: Manage multiple Unikraft Cloud accounts and configurations with profiles
+---
+
+Profiles allow you to maintain separate configurations for different Unikraft Cloud accounts, organizations, or environments. Each profile contains authentication credentials, metro configurations, and other settings.
+
+## Understanding Profiles
+
+A profile is a named configuration that includes:
+
+- **Authentication token**: API token for Unikraft Cloud
+- **Organization**: Associated organization name
+- **Control plane endpoint**: API endpoint for authentication
+- **Metro list**: Available deployment regions
+
+Profiles enable seamless switching between:
+
+- Multiple organizations
+- Development, staging, and production environments
+- Different control plane endpoints (for self-hosted installations)
+
+## Listing Profiles
+
+View all configured profiles:
+
+```bash
+unikraft profile list
+```
+
+Example output:
+
+```
+NAME           ACTIVE  METROS
+my-org         true    fra, sfo, sin
+staging        false   fra
+production     false   fra, sfo, sin, dal
+```
+
+The `ACTIVE` column indicates the currently selected profile.
+
+### JSON Output
+
+Get profile information in JSON format for scripting:
+
+```bash
+unikraft profile list -o json
+```
+
+## Inspecting a Profile
+
+View detailed information about a specific profile:
+
+```bash
+unikraft profile get my-org
+```
+
+Example output:
+
+```
+NAME      my-org
+ACTIVE    true
+METROS    fra, sfo, sin
+```
+
+### View Specific Fields
+
+Select which fields to display:
+
+```bash
+unikraft profile get my-org --fields name,metros
+```
+
+## Switching Profiles
+
+Change the active profile to switch between configurations:
+
+<Steps>
+  <Step title="List available profiles">
+    ```bash
+    unikraft profile list
+    ```
+  </Step>
+
+  <Step title="Switch to desired profile">
+    ```bash
+    unikraft profile use staging
+    ```
+  </Step>
+
+  <Step title="Verify the switch">
+    ```bash
+    unikraft profile list
+    ```
+    The new profile will show `ACTIVE: true`.
+  </Step>
+</Steps>
+
+### Temporary Profile Override
+
+Use a different profile for a single command without changing the default:
+
+```bash
+unikraft --profile staging instances list
+```
+
+This is useful for:
+
+- Quick checks across environments
+- Scripting operations across multiple accounts
+- Testing without changing your current context
+
+## Creating Profiles
+
+Profiles are automatically created during the login process:
+
+<Steps>
+  <Step title="Login to Unikraft Cloud">
+    ```bash
+    unikraft login
+    ```
+  </Step>
+
+  <Step title="Authenticate with your organization">
+    Complete the browser-based authentication flow.
+  </Step>
+
+  <Step title="Profile created automatically">
+    The CLI creates a profile named after your organization.
+  </Step>
+</Steps>
+
+### Multiple Profiles for Same Organization
+
+When logging in to the same organization with different control plane endpoints, the CLI creates uniquely named profiles:
+
+```bash
+# First login creates "my-org"
+unikraft login
+
+# Second login to different endpoint creates "my-org-2"
+unikraft login --controlplane https://dev.controlplane.example.com
+```
+
+### Manual Profile Configuration
+
+Advanced users can manually edit the configuration file to create profiles:
+
+**Linux/macOS**: `~/.config/unikraft/config.yaml`
+
+```yaml
+profile: production
+profiles:
+  production:
+    type: cloud
+    organization: my-company
+    token: prod-api-token-here
+    controlplane: https://controlplane.unikraft.cloud
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+      - name: sfo
+        endpoint: https://api.sfo.unikraft.cloud
+        country: us
+  
+  staging:
+    type: cloud
+    organization: my-company-staging
+    token: staging-api-token-here
+    controlplane: https://controlplane.unikraft.cloud
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+```
+
+## Profile Configuration Structure
+
+Each profile contains the following fields:
+
+| Field | Description | Required |
+|-------|-------------|----------|
+| `type` | Profile type (currently only `cloud` supported) | Yes |
+| `token` | API authentication token | Yes |
+| `organization` | Organization name | Yes |
+| `controlplane` | Control plane endpoint URL | No (defaults to official endpoint) |
+| `metros` | List of available metro configurations | No (fetched automatically on login) |
+
+### Metro Configuration
+
+Each metro in a profile includes:
+
+```yaml
+metros:
+  - name: fra              # Metro identifier (e.g., fra, sfo, sin)
+    endpoint: https://api.fra.unikraft.cloud  # API endpoint
+    country: de            # ISO country code
+    insecure: false        # Skip TLS verification (development only)
+```
+
+## Environment Variable Override
+
+Override the active profile using the `UNIKRAFT_PROFILE` environment variable:
+
+```bash
+export UNIKRAFT_PROFILE=staging
+unikraft instances list
+```
+
+This is useful for:
+
+- CI/CD pipelines with different environments
+- Shell scripts that manage multiple accounts
+- Temporary context switching
+
+## Common Workflows
+
+### Development and Production Separation
+
+Maintain separate profiles for different environments:
+
+<Steps>
+  <Step title="Setup development profile">
+    ```bash
+    unikraft login
+    # Authenticate with dev organization
+    ```
+  </Step>
+
+  <Step title="Setup production profile">
+    ```bash
+    unikraft login
+    # Authenticate with production organization
+    ```
+  </Step>
+
+  <Step title="Switch contexts as needed">
+    ```bash
+    # Work on development
+    unikraft profile use dev-org
+    unikraft run --metro fra nginx:latest
+
+    # Deploy to production
+    unikraft profile use prod-org
+    unikraft run --metro fra,sfo,sin nginx:latest
+    ```
+  </Step>
+</Steps>
+
+### Multi-Organization Management
+
+Manage resources across multiple organizations:
+
+```bash
+# Check instances in first organization
+unikraft --profile org1 instances list
+
+# Check instances in second organization
+unikraft --profile org2 instances list
+
+# Deploy to specific organization
+unikraft --profile org2 run --metro fra nginx:latest
+```
+
+### Team Collaboration
+
+Share profile configuration (without tokens) with team members:
+
+```yaml
+# shared-config-template.yaml
+profile: company-dev
+profiles:
+  company-dev:
+    type: cloud
+    organization: company-dev
+    controlplane: https://controlplane.unikraft.cloud
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+```
+
+Team members can:
+
+1. Copy this template
+2. Add their own token: `unikraft login --token ~/.token`
+3. Begin working immediately
+
+## Troubleshooting
+
+### Profile Not Found
+
+If you see "profile not found" errors:
+
+```bash
+# List all profiles to find the correct name
+unikraft profile list
+
+# Use the exact profile name
+unikraft profile use <exact-name>
+```
+
+### Invalid Profile Configuration
+
+If a profile is invalid:
+
+1. Check the configuration file for syntax errors:
+   ```bash
+   cat ~/.config/unikraft/config.yaml
+   ```
+
+2. Verify required fields are present:
+   - `type: cloud`
+   - `token: <your-token>`
+   - `organization: <org-name>`
+
+3. Re-authenticate to fix configuration:
+   ```bash
+   unikraft logout
+   unikraft login
+   ```
+
+### No Profiles Configured
+
+If you receive "profile not setup" errors:
+
+```bash
+# Login to create your first profile
+unikraft login
+```
+
+## Configuration File Location
+
+The CLI stores profiles in platform-specific locations:
+
+- **Linux**: `~/.config/unikraft/config.yaml`
+- **macOS**: `~/Library/Application Support/unikraft/config.yaml`
+- **Windows**: `%APPDATA%\unikraft\config.yaml`
+
+### Custom Configuration Path
+
+Use a different configuration file:
+
+```bash
+# Via command-line flag
+unikraft --config /path/to/config.yaml instances list
+
+# Via environment variable
+export UNIKRAFT_CONFIG=/path/to/config.yaml
+unikraft instances list
+```
+
+## Security Considerations
+
+<CardGroup cols={2}>
+  <Card title="Protect Configuration Files" icon="lock">
+    Set restrictive permissions on configuration files:
+    ```bash
+    chmod 600 ~/.config/unikraft/config.yaml
+    ```
+  </Card>
+
+  <Card title="Never Commit Tokens" icon="code-branch">
+    Add configuration files to `.gitignore` to prevent accidental token exposure.
+  </Card>
+
+  <Card title="Separate Production Tokens" icon="shield-check">
+    Use dedicated tokens for production with limited permissions.
+  </Card>
+
+  <Card title="Regular Token Rotation" icon="rotate">
+    Periodically rotate tokens, especially for shared or production environments.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Start deploying unikernel instances across metros
+  </Card>
+
+  <Card title="Output Formats" icon="table" href="/guides/output-formats">
+    Customize command output for different use cases
+  </Card>
+</CardGroup>

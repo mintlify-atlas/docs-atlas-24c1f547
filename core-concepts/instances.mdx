@@ -1,0 +1,206 @@
+---
+title: Instances
+description: Running unikernel instances on Unikraft Cloud
+---
+
+Instances are the fundamental compute units in Unikraft Cloud. Each instance is a running unikernel with dedicated resources, network configuration, and optional persistent storage.
+
+## What is an Instance?
+
+An instance represents a single running unikernel in a specific metro. It executes an image with specified resources (memory and vCPUs), can be configured with environment variables and arguments, and can attach to volumes and service groups for networking.
+
+## Key Properties
+
+### Identification
+
+- **Name** (`string`) - Human-readable identifier for the instance
+- **UUID** (`string`) - Unique identifier assigned by the platform
+- **Metro** (`string`) - Geographic location where the instance runs (e.g., `fra`, `ewr`)
+
+### Runtime Configuration
+
+- **Image** (`string`) - Container/unikernel image to run (instances.go:59)
+- **Args** (`[]string`) - Command-line arguments passed to the instance (instances.go:62)
+- **Env** (`map[string]string`) - Environment variables (instances.go:63)
+
+### Resource Allocation
+
+- **Memory** (`types.SizeMebibytes`) - RAM allocated in mebibytes (instances.go:67)
+- **VCPUs** (`int`) - Number of virtual CPUs (instances.go:68)
+
+### State Management
+
+- **State** (`types.InstanceState`) - Current lifecycle state (instances.go:58)
+  - `stopped` - Instance is not running
+  - `starting` - Instance is booting
+  - `running` - Instance is active
+  - `draining` - Instance is gracefully shutting down
+  - `stopping` - Instance is being stopped
+  - `standby` - Instance is in scale-to-zero standby mode
+
+### Volumes
+
+Instances can attach persistent volumes using the `Volumes` field (instances.go:71):
+
+- **UUID/Name** (`string`) - Volume identifier
+- **At** (`string`) - Mount path inside the instance
+- **Readonly** (`bool`) - Whether the volume is read-only
+- **Size** (`types.SizeMebibytes`) - Size for new volumes (create-only)
+
+### Service Groups
+
+Instances can join a service group for load balancing and domain routing (instances.go:73-82):
+
+- **Service.UUID/Name** (`string`) - Service group identifier
+- **Service.Domains** (`[]Domain`) - DNS domains routing to this instance
+- **Service.Services** (`[]*Service`) - Port and handler configuration
+
+### Advanced Features
+
+#### Scale-to-Zero (instances.go:96)
+
+- **Policy** (`string`) - When to scale down (`request` or `time`)
+- **Stateful** (`bool`) - Preserve state when scaled to zero
+- **CooldownTime** (`int64`) - Milliseconds before scaling down
+
+#### Restart Policy (instances.go:104-108)
+
+- **Policy** (`string`) - When to restart (`always`, `on-failure`, or `never`)
+- **StartCount** (`int`) - Total number of starts
+- **RestartCount** (`int`) - Number of restarts
+
+### Timing Information
+
+- **Created** (`types.RelativeTime`) - When the instance was created (instances.go:91)
+- **Uptime** (`types.DurationMS`) - How long the instance has been running (instances.go:99)
+- **BootTime** (`types.DurationUS`) - Time to boot in microseconds (instances.go:100)
+- **NetTime** (`types.DurationUS`) - Network initialization time (instances.go:101)
+
+## Instance Lifecycle
+
+### Creating an Instance
+
+```bash
+unikraft instance create \
+  --set name=demo-instance \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set autostart=true \
+  --set resources.memory=128 \
+  --set resources.vcpus=1
+```
+
+### Managing State
+
+```bash
+# Start a stopped instance
+unikraft instance start demo-instance
+
+# Stop a running instance
+unikraft instance stop demo-instance
+
+# Restart an instance
+unikraft instance restart demo-instance
+```
+
+### Viewing Logs
+
+```bash
+# Fetch recent logs
+unikraft instance logs demo-instance
+
+# Follow logs in real-time
+unikraft instance logs demo-instance --follow
+
+# Show last 100 lines
+unikraft instance logs demo-instance --tail 100
+```
+
+### Editing Resources
+
+```bash
+# Resize memory
+unikraft instance edit demo-instance --set resources.memory=256
+
+# Update image
+unikraft instance edit demo-instance --set image=nginx:1.25
+
+# Add environment variables
+unikraft instance edit demo-instance --add runtime.env=DEBUG=1
+```
+
+## Common Use Cases
+
+### Web Application
+
+Run a web server with a service group for public access:
+
+```bash
+unikraft instance create \
+  --set name=web-app \
+  --set metro=fra \
+  --set image=my-app:latest \
+  --set resources.memory=256 \
+  --set resources.vcpus=2 \
+  --set service.services=443:8080/tls+http \
+  --set service.domains=name=myapp
+```
+
+### Stateful Application with Volume
+
+Attach persistent storage for databases or stateful workloads:
+
+```bash
+unikraft instance create \
+  --set name=postgres \
+  --set metro=fra \
+  --set image=postgres:latest \
+  --set resources.memory=512 \
+  --set volumes=data-volume:/var/lib/postgresql/data
+```
+
+### Auto-Scaling with Scale-to-Zero
+
+Reduce costs by scaling to zero during idle periods:
+
+```bash
+unikraft instance create \
+  --set name=worker \
+  --set metro=fra \
+  --set image=worker:latest \
+  --set scale-to-zero.policy=request \
+  --set scale-to-zero.stateful=true \
+  --set scale-to-zero.cooldown-time=30000
+```
+
+## Relationship to Other Resources
+
+<CardGroup cols={2}>
+  <Card title="Images" icon="box" href="/core-concepts/images">
+    Instances run from images stored in the registry
+  </Card>
+  <Card title="Volumes" icon="hard-drive" href="/core-concepts/volumes">
+    Attach persistent storage to instances
+  </Card>
+  <Card title="Services" icon="network-wired" href="/core-concepts/services">
+    Expose instances via load-balanced service groups
+  </Card>
+  <Card title="Metros" icon="globe" href="/core-concepts/metros">
+    Instances run in specific geographic metros
+  </Card>
+</CardGroup>
+
+<Note>
+  Instances are ephemeral by default. Use volumes for persistent data and configure restart policies for high availability.
+</Note>
+
+<Tip>
+  Monitor boot time and uptime metrics to optimize instance performance. Unikraft instances typically boot in microseconds.
+</Tip>
+
+## Performance Characteristics
+
+- **Boot Time**: Typically measured in microseconds (instances.go:100)
+- **Memory Footprint**: Can run with as little as 16MB RAM
+- **Network Performance**: Sub-millisecond network initialization (instances.go:101)
+- **Scale-to-Zero**: Near-instant wake-up from standby state

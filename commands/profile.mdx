@@ -1,0 +1,231 @@
+---
+title: unikraft profile
+description: Manage and switch between Unikraft CLI profiles
+---
+
+## Syntax
+
+```bash
+unikraft profile [COMMAND]
+```
+
+## Description
+
+Manage Unikraft CLI profiles. A profile stores authentication credentials, organization information, and metro (region) endpoints for Unikraft Cloud. You can maintain multiple profiles to work with different organizations or control plane instances.
+
+Profiles are automatically created when you run `unikraft login`. Each profile is associated with an organization and optionally a specific control plane endpoint.
+
+## Subcommands
+
+### list
+
+List all configured profiles.
+
+```bash
+unikraft profile list [OPTIONS]
+```
+
+Displays a table of all profiles with their active status and available metros.
+
+**Output fields:**
+- `NAME`: Profile name (typically the organization name)
+- `ACTIVE`: Whether this profile is currently active (true/false)
+- `METROS`: Comma-separated list of available metro names
+
+### get
+
+Get detailed information about a specific profile.
+
+```bash
+unikraft profile get <NAME> [OPTIONS]
+```
+
+**Arguments:**
+- `NAME`: Name of the profile to inspect
+
+Displays detailed information about the specified profile, including all metros and their endpoints.
+
+### use
+
+Switch to a different profile.
+
+```bash
+unikraft profile use <NAME>
+```
+
+**Arguments:**
+- `NAME`: Name of the profile to switch to
+
+Sets the specified profile as the default profile for all subsequent commands.
+
+## Profile Structure
+
+Each profile contains:
+
+<ParamField path="name" type="string">
+  The profile name, typically matching your organization name.
+</ParamField>
+
+<ParamField path="active" type="boolean">
+  Whether this profile is currently the default active profile.
+</ParamField>
+
+<ParamField path="metros" type="array">
+  List of available metro (region) names where you can deploy instances.
+</ParamField>
+
+## Examples
+
+### List all profiles
+
+```bash
+unikraft profile list
+```
+
+Example output:
+
+```
+NAME    ACTIVE  METROS
+myorg   true    fra0, lhr0, ams1
+testorg false   fra0
+```
+
+The active profile (marked `true`) is used by default for all cloud operations.
+
+### Get profile details
+
+```bash
+unikraft profile get myorg
+```
+
+Example output:
+
+```
+NAME   ACTIVE  METROS
+myorg  true    fra0, lhr0, ams1
+```
+
+For more detailed output, use JSON format:
+
+```bash
+unikraft profile get myorg -o json
+```
+
+```json
+{
+  "name": "myorg",
+  "active": true,
+  "metros": ["fra0", "lhr0", "ams1"]
+}
+```
+
+### Switch between profiles
+
+```bash
+unikraft profile use testorg
+```
+
+Switches to the `testorg` profile:
+
+```
+switched profile profile=testorg
+```
+
+All subsequent cloud commands will use the `testorg` profile's credentials and settings.
+
+### Verify current profile
+
+```bash
+unikraft profile list
+```
+
+```
+NAME    ACTIVE  METROS
+myorg   false   fra0, lhr0, ams1
+testorg true    fra0
+```
+
+The `ACTIVE` column shows which profile is currently in use.
+
+## Common Workflows
+
+### Working with multiple organizations
+
+If you're part of multiple organizations:
+
+```bash
+# Login to first organization
+unikraft login
+# authenticated organization=myorg
+
+# Login to second organization
+unikraft login
+# authenticated organization=testorg
+
+# List all profiles
+unikraft profile list
+# NAME    ACTIVE  METROS
+# myorg   false   fra0, lhr0
+# testorg true    fra0
+
+# Switch back to first organization
+unikraft profile use myorg
+# switched profile profile=myorg
+```
+
+### Testing with different control planes
+
+When testing against staging or development control planes:
+
+```bash
+# Login to production
+unikraft login
+# Creates profile: myorg
+
+# Login to staging control plane
+unikraft login --controlplane https://staging.unikraft.cloud
+# Creates profile: myorg-2 (numeric suffix for different control plane)
+
+# Switch between environments
+unikraft profile use myorg     # Use production
+unikraft profile use myorg-2   # Use staging
+```
+
+### Inspect available metros
+
+```bash
+unikraft profile get myorg -o json | jq '.metros[]'
+```
+
+```
+"fra0"
+"lhr0"
+"ams1"
+```
+
+This shows all metros (regions) available for deployment with this profile.
+
+## Error Handling
+
+### Profile not found
+
+```bash
+unikraft profile use nonexistent
+```
+
+```
+Error: profile "nonexistent" not found
+```
+
+### No profiles configured
+
+```bash
+unikraft profile list
+```
+
+If you haven't logged in yet, the list will be empty. Run `unikraft login` to create your first profile.
+
+## Related Commands
+
+- [`unikraft login`](/commands/login) - Authenticate and create a new profile
+- [`unikraft logout`](/commands/logout) - Remove the current profile

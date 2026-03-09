@@ -1,0 +1,622 @@
+---
+title: Service Groups
+description: Configure load balancing, service discovery, and networking for your Unikraft Cloud instances
+---
+
+Service groups provide load balancing, automatic service discovery, and unified network endpoints for your instances on Unikraft Cloud. They enable you to expose multiple instances behind a single domain with automatic traffic distribution.
+
+## Understanding Service Groups
+
+A service group is a logical grouping of instances that:
+
+- **Load balances** traffic across healthy instances
+- **Provides service discovery** with automatic DNS
+- **Manages TLS certificates** for HTTPS endpoints
+- **Handles custom domains** with automatic certificate provisioning
+- **Supports multiple protocols** (HTTP, HTTPS, TCP)
+
+## Creating Service Groups
+
+Create a service group with port configuration:
+
+```bash
+unikraft services create \
+  --set name=web-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls
+```
+
+Format for services: `SOURCE:DESTINATION/HANDLERS`
+
+- **SOURCE**: External port (e.g., 443)
+- **DESTINATION**: Instance port (e.g., 8080)
+- **HANDLERS**: Protocol handlers (e.g., `http+tls`, `http`, `tcp`)
+
+### With Custom Domain
+
+Create a service group with a custom domain:
+
+```bash
+unikraft services create \
+  --set name=api-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=api.example.com
+```
+
+### Multiple Ports and Domains
+
+<CodeGroup>
+```bash HTTP + HTTPS
+unikraft services create \
+  --set name=web-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set services=80:443/http+redirect \
+  --set domains=www.example.com
+```
+
+```bash Multiple Domains
+unikraft services create \
+  --set name=multi-domain \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=app.example.com \
+  --set domains=www.example.com
+```
+
+```bash Custom Ports
+unikraft services create \
+  --set name=custom-service \
+  --set metro=sfo \
+  --set services=8443:8080/http+tls \
+  --set services=9000:9000/tcp
+```
+</CodeGroup>
+
+## Listing Service Groups
+
+View all service groups across metros:
+
+```bash
+unikraft services list
+```
+
+Example output:
+
+```
+METRO  NAME          UUID                                  INSTANCES  DOMAINS
+fra    web-service   550e8400-e29b-41d4-a716-446655440000  3          www.example.com
+fra    api-service   6ba7b810-9dad-11d1-80b4-00c04fd430c8  2          api.example.com
+sfo    staging       6ba7b811-9dad-11d1-80b4-00c04fd430c9  1          staging.example.com
+```
+
+### JSON Output
+
+```bash
+unikraft services list -o json
+```
+
+## Inspecting Service Groups
+
+View detailed service group information:
+
+```bash
+unikraft services get web-service
+```
+
+Example output:
+
+```
+METRO        fra
+NAME         web-service
+UUID         550e8400-e29b-41d4-a716-446655440000
+CREATED      2 hours ago
+DOMAINS      www.example.com (cert: www-example-cert)
+INSTANCES    web-1, web-2, web-3
+SERVICES     443:8080/http+tls, 80:443/http+redirect
+AUTOSCALE    false
+LIMITS       soft=0, hard=0
+```
+
+## Deploying Instances to Service Groups
+
+### During Instance Creation
+
+Deploy an instance directly into a service group:
+
+```bash
+unikraft run --metro fra \
+  --service web-service \
+  nginx:latest
+```
+
+This automatically registers the instance with the service group's load balancer.
+
+### Create Service Group Inline
+
+Create a service group during instance deployment:
+
+```bash
+unikraft run --metro fra \
+  -p 443:8080/http+tls \
+  -p 80:443/http+redirect \
+  --domain www.example.com \
+  nginx:latest
+```
+
+The CLI automatically creates a service group for these settings.
+
+### Multiple Instances
+
+Deploy multiple instances to the same service group:
+
+<Steps>
+  <Step title="Deploy first instance">
+    ```bash
+    unikraft run --metro fra \
+      --name web-1 \
+      --service web-service \
+      nginx:latest
+    ```
+  </Step>
+
+  <Step title="Deploy second instance">
+    ```bash
+    unikraft run --metro fra \
+      --name web-2 \
+      --service web-service \
+      nginx:latest
+    ```
+  </Step>
+
+  <Step title="Deploy third instance">
+    ```bash
+    unikraft run --metro fra \
+      --name web-3 \
+      --service web-service \
+      nginx:latest
+    ```
+  </Step>
+</Steps>
+
+Traffic is automatically distributed across all healthy instances.
+
+## Service Ports Configuration
+
+### HTTP with TLS
+
+Expose HTTPS endpoint with automatic certificate:
+
+```bash
+unikraft services create \
+  --set name=https-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=secure.example.com
+```
+
+### HTTP Redirect
+
+Redirect HTTP traffic to HTTPS:
+
+```bash
+unikraft services create \
+  --set name=redirect-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set services=80:443/http+redirect \
+  --set domains=www.example.com
+```
+
+### Plain HTTP
+
+For internal or development services:
+
+```bash
+unikraft services create \
+  --set name=http-service \
+  --set metro=fra \
+  --set services=80:8080/http
+```
+
+### TCP Services
+
+For non-HTTP protocols:
+
+```bash
+unikraft services create \
+  --set name=tcp-service \
+  --set metro=fra \
+  --set services=3306:3306/tcp
+```
+
+### Multiple Service Ports
+
+```bash
+unikraft services create \
+  --set name=multi-port \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set services=8443:8443/http+tls \
+  --set services=9000:9000/tcp
+```
+
+## Managing Domains
+
+### Add Domain to Existing Service
+
+```bash
+unikraft services edit web-service \
+  --add domains=app.example.com
+```
+
+### Multiple Domains
+
+```bash
+unikraft services edit web-service \
+  --add domains=www.example.com \
+  --add domains=app.example.com \
+  --add domains=api.example.com
+```
+
+### Remove Domain
+
+```bash
+unikraft services edit web-service \
+  --del domains=old-domain.example.com
+```
+
+### Replace All Domains
+
+```bash
+unikraft services edit web-service \
+  --set domains=new-domain.example.com
+```
+
+## Connection Limits
+
+Configure soft and hard connection limits for service groups:
+
+### Soft Limit
+
+Start scale-to-zero after this many concurrent connections:
+
+```bash
+unikraft services create \
+  --set name=limited-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set limits.soft=1000
+```
+
+### Hard Limit
+
+Reject connections beyond this threshold:
+
+```bash
+unikraft services create \
+  --set name=strict-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set limits.soft=1000 \
+  --set limits.hard=2000
+```
+
+### Update Limits
+
+```bash
+unikraft services edit web-service \
+  --set limits.soft=5000 \
+  --set limits.hard=10000
+```
+
+## Editing Service Groups
+
+### Add Service Port
+
+```bash
+unikraft services edit web-service \
+  --add services=8443:8080/http+tls
+```
+
+### Remove Service Port
+
+```bash
+unikraft services edit web-service \
+  --del services=8443:8080/http+tls
+```
+
+### Replace Service Configuration
+
+```bash
+unikraft services edit web-service \
+  --set services=443:8080/http+tls \
+  --set services=80:443/http+redirect
+```
+
+## Deleting Service Groups
+
+Remove a service group:
+
+```bash
+unikraft services delete web-service
+```
+
+<Warning>
+  Deleting a service group removes the load balancer and DNS entries. Instances remain running but become inaccessible via the service group's domains.
+</Warning>
+
+### Delete Multiple Service Groups
+
+```bash
+unikraft services delete service-1 service-2 service-3
+```
+
+## TLS Certificates
+
+Service groups automatically provision and renew TLS certificates for domains.
+
+### Automatic Certificate Provisioning
+
+When you add a domain, a certificate is automatically created:
+
+```bash
+unikraft services create \
+  --set name=auto-tls \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=auto.example.com
+```
+
+The platform handles:
+
+- Certificate issuance via Let's Encrypt
+- Automatic renewal before expiration
+- DNS validation
+
+### Using Existing Certificates
+
+For custom certificates, create them first:
+
+```bash
+# Create certificate
+unikraft certificates create \
+  --set name=my-cert \
+  --set cn=custom.example.com \
+  --set-file chain=cert.pem \
+  --set-file pkey=key.pem \
+  --set metro=fra
+
+# Reference in service group (done automatically when domain matches)
+unikraft services create \
+  --set name=custom-tls \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=custom.example.com
+```
+
+## Common Patterns
+
+### Web Application with Auto-Scaling
+
+<Steps>
+  <Step title="Create service group">
+    ```bash
+    unikraft services create \
+      --set name=web-app \
+      --set metro=fra \
+      --set services=443:8080/http+tls \
+      --set services=80:443/http+redirect \
+      --set domains=www.myapp.com \
+      --set limits.soft=1000 \
+      --set limits.hard=2000
+    ```
+  </Step>
+
+  <Step title="Deploy instances with scale-to-zero">
+    ```bash
+    for i in {1..3}; do
+      unikraft run --metro fra \
+        --name web-$i \
+        --service web-app \
+        --scale-to-zero policy=on,cooldown-time=300000 \
+        web-app:latest
+    done
+    ```
+  </Step>
+
+  <Step title="Verify service">
+    ```bash
+    unikraft services get web-app
+    curl https://www.myapp.com
+    ```
+  </Step>
+</Steps>
+
+### Microservices Architecture
+
+<CodeGroup>
+```bash Frontend Service
+unikraft services create \
+  --set name=frontend \
+  --set metro=fra \
+  --set services=443:3000/http+tls \
+  --set domains=app.example.com
+
+unikraft run --metro fra \
+  --service frontend \
+  frontend:latest
+```
+
+```bash API Gateway
+unikraft services create \
+  --set name=api-gateway \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=api.example.com
+
+unikraft run --metro fra \
+  --service api-gateway \
+  api-gateway:latest
+```
+
+```bash Internal Service
+unikraft services create \
+  --set name=backend \
+  --set metro=fra \
+  --set services=8080:8080/http
+
+unikraft run --metro fra \
+  --service backend \
+  backend:latest
+```
+</CodeGroup>
+
+### Blue-Green Deployment
+
+<Steps>
+  <Step title="Deploy green environment">
+    ```bash
+    unikraft services create \
+      --set name=app-green \
+      --set metro=fra \
+      --set services=443:8080/http+tls \
+      --set domains=green.example.com
+
+    unikraft run --metro fra \
+      --service app-green \
+      app:v2.0
+    ```
+  </Step>
+
+  <Step title="Test green environment">
+    ```bash
+    curl https://green.example.com
+    ```
+  </Step>
+
+  <Step title="Switch production traffic">
+    ```bash
+    unikraft services edit app-production \
+      --set domains=green.example.com
+    ```
+  </Step>
+</Steps>
+
+## Monitoring and Debugging
+
+### Check Instance Health
+
+```bash
+# View instances in service group
+unikraft services get web-service --fields instances
+
+# Check instance states
+unikraft instances list | grep web-
+```
+
+### View Service Configuration
+
+```bash
+unikraft services get web-service --fields services,domains
+```
+
+### Test Load Balancing
+
+```bash
+# Make multiple requests to see load distribution
+for i in {1..10}; do
+  curl -s https://www.example.com | grep hostname
+done
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="tag">
+    Name service groups clearly: `prod-web`, `staging-api`, `dev-frontend`.
+  </Card>
+
+  <Card title="HTTPS by Default" icon="lock">
+    Always use `http+tls` for production services and redirect HTTP to HTTPS.
+  </Card>
+
+  <Card title="Set Connection Limits" icon="gauge">
+    Configure soft/hard limits to prevent resource exhaustion.
+  </Card>
+
+  <Card title="Multiple Instances" icon="server">
+    Deploy at least 2-3 instances per service group for high availability.
+  </Card>
+
+  <Card title="Health Checks" icon="heart-pulse">
+    Ensure instances properly handle health check requests.
+  </Card>
+
+  <Card title="DNS Propagation" icon="globe">
+    Allow time for DNS changes to propagate when adding domains.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Domain Not Resolving
+
+If a domain doesn't resolve:
+
+1. **Check DNS configuration**:
+   ```bash
+   dig www.example.com
+   nslookup www.example.com
+   ```
+
+2. **Verify domain in service group**:
+   ```bash
+   unikraft services get web-service --fields domains
+   ```
+
+3. **Allow DNS propagation time** (up to 48 hours in some cases)
+
+### Certificate Issues
+
+If HTTPS is not working:
+
+```bash
+# Check certificate status
+unikraft certificates list
+
+# View service group domains
+unikraft services get web-service --fields domains
+
+# Verify TLS handler is configured
+unikraft services get web-service --fields services
+```
+
+### No Traffic to Instances
+
+If instances aren't receiving traffic:
+
+1. **Verify instances are running**:
+   ```bash
+   unikraft instances list --fields name,state
+   ```
+
+2. **Check service group membership**:
+   ```bash
+   unikraft services get web-service --fields instances
+   ```
+
+3. **Ensure ports match** between service group and instances
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="TLS Certificates" icon="certificate" href="/guides/tls-certificates">
+    Learn about custom certificate management
+  </Card>
+
+  <Card title="Scale-to-Zero" icon="chart-line-down" href="/guides/scale-to-zero">
+    Optimize costs with automatic scaling
+  </Card>
+</CardGroup>

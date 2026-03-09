@@ -1,0 +1,243 @@
+---
+title: 'services'
+description: 'Manage Unikraft Cloud service groups'
+---
+
+Manage service groups in Unikraft Cloud. Service groups define how instances are exposed to the network through port mappings, load balancing, and domain associations.
+
+## Usage
+
+```bash
+unikraft service [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List service groups">
+  List all service groups across metros.
+
+  ```bash
+  unikraft service list [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # List all service groups
+  unikraft service list
+  ```
+
+  ```bash
+  $ unikraft service list
+  NAME            AUTOSCALE  CREATED       METRO
+  demo-service    true       1 hour ago    fra
+  api-service     false      3 days ago    lhr
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect a service group">
+  Get detailed information about one or more service groups by name or UUID.
+
+  ```bash
+  unikraft service get <name|uuid> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Inspect a service group by name or UUID
+  unikraft service get demo-service
+  ```
+
+  ```bash
+  $ unikraft service get demo-service
+  NAME        demo-service
+  UUID        770e9611-g49d-63f6-c938-668877662222
+  AUTOSCALE   true
+  CREATED     1 hour ago
+  METRO       fra
+  DOMAINS     demo.unikraft.dev
+  SERVICES    443:8080/tls+http
+  ```
+</Accordion>
+
+<Accordion title="create - Create a new service group">
+  Create a new service group.
+
+  ```bash
+  unikraft service create [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set name=<string>" type="string">
+    Service group name
+  </ParamField>
+
+  <ParamField path="--set metro=<string>" type="string" required>
+    Metro where the service will be created (e.g., `fra`, `lhr`, `ewr`)
+  </ParamField>
+
+  <ParamField path="--set services=<spec>" type="array" required>
+    Service port mapping in format `SOURCE:DEST/HANDLERS` (e.g., `443:8080/tls+http`)
+  </ParamField>
+
+  <ParamField path="--set domains=<domain>" type="array">
+    Domain names to associate with the service
+  </ParamField>
+
+  <ParamField path="--set limits.soft=<int>" type="integer">
+    Soft limit for concurrent connections
+  </ParamField>
+
+  <ParamField path="--set limits.hard=<int>" type="integer">
+    Hard limit for concurrent connections
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Create a new service group
+  unikraft service create \
+    --set name=demo-service \
+    --set metro=fra \
+    --set domains=name=demo \
+    --set services=443:8080/tls+http
+  ```
+
+  ```bash
+  $ unikraft service create \
+      --set name=demo-service \
+      --set metro=fra \
+      --set domains=name=demo \
+      --set services=443:8080/tls+http
+  Created service group demo-service in fra
+  NAME      demo-service
+  METRO     fra
+  DOMAINS   demo.unikraft.dev
+  SERVICES  443:8080/tls+http
+  ```
+</Accordion>
+
+<Accordion title="edit - Edit a service group">
+  Edit service group configuration.
+
+  ```bash
+  unikraft service edit <name|uuid> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set services=<spec>" type="array">
+    Replace all service port mappings
+  </ParamField>
+
+  <ParamField path="--add services=<spec>" type="array">
+    Add a new service port mapping
+  </ParamField>
+
+  <ParamField path="--del services=<spec>" type="array">
+    Remove a service port mapping
+  </ParamField>
+
+  <ParamField path="--set domains=<domain>" type="array">
+    Replace all domain associations
+  </ParamField>
+
+  <ParamField path="--add domains=<domain>" type="array">
+    Add a new domain
+  </ParamField>
+
+  <ParamField path="--del domains=<domain>" type="array">
+    Remove a domain
+  </ParamField>
+
+  <ParamField path="--set limits.soft=<int>" type="integer">
+    Update soft connection limit
+  </ParamField>
+
+  <ParamField path="--set limits.hard=<int>" type="integer">
+    Update hard connection limit
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Add a new service port
+  unikraft service edit demo-service --add services=8443:8080/tls
+  ```
+
+  ```bash
+  $ unikraft service edit demo-service --add services=8443:8080/tls
+  Updated service group demo-service
+  + SERVICES  8443:8080/tls
+  ```
+</Accordion>
+
+<Accordion title="delete - Delete service groups">
+  Delete one or more service groups.
+
+  ```bash
+  unikraft service delete <name|uuid>... [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Delete a service group by name or UUID
+  unikraft service delete demo-service
+  ```
+
+  ```bash
+  $ unikraft service delete demo-service
+  Deleted service group demo-service
+  ```
+</Accordion>
+
+## Service Port Specification
+
+Service port mappings use the format:
+
+```
+SOURCE:DESTINATION/HANDLERS
+```
+
+- `SOURCE` - External port that receives traffic
+- `DESTINATION` - Internal port where the instance listens
+- `HANDLERS` - Protocol handlers separated by `+`
+
+### Available Handlers
+
+- `http` - HTTP protocol handler
+- `tls` - TLS termination
+- `redirect` - HTTP to HTTPS redirect
+
+### Examples
+
+```bash
+# HTTPS with TLS termination
+--set services=443:8080/tls+http
+
+# HTTP only
+--set services=80:8080/http
+
+# Multiple ports
+--set services=443:8080/tls+http --set services=80:8080/redirect
+```
+
+## Domain Specification
+
+Domains can be specified in multiple ways:
+
+```bash
+# Using name= prefix (recommended)
+--set domains=name=demo
+
+# Using FQDN with trailing dot
+--set domains=demo.unikraft.dev.
+```
+
+## See Also
+
+- [instances](/commands/instances) - Manage instances in service groups
+- [certificates](/commands/certificates) - Manage TLS certificates for domains

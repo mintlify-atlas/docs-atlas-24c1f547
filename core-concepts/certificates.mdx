@@ -1,0 +1,285 @@
+---
+title: Certificates
+description: TLS certificates for secure HTTPS connections
+---
+
+Certificates provide TLS/SSL encryption for service groups. Upload your own certificates or use automatically generated ones for Unikraft-managed domains.
+
+## What is a Certificate?
+
+A certificate is an X.509 TLS certificate stored in a metro that can be associated with service group domains. Certificates enable HTTPS encryption and are automatically matched to domains based on the common name (CN).
+
+## Key Properties
+
+### Identification
+
+- **Name** (`string`) - Human-readable certificate name (certificates.go:37)
+- **UUID** (`string`) - Unique identifier (certificates.go:38)
+- **Metro** (`string`) - Geographic location where the certificate is stored (certificates.go:36)
+
+### Certificate Information
+
+- **CommonName** (`string`) - Primary domain name (CN) from the certificate (certificates.go:45)
+- **Subject** (`string`) - Full X.509 subject string (certificates.go:46)
+- **Issuer** (`string`) - Certificate authority that issued the certificate (certificates.go:47)
+- **SerialNumber** (`string`) - Unique certificate serial number (certificates.go:48)
+
+### State
+
+- **State** (`types.CertificateState`) - Current certificate status (certificates.go:50)
+  - `pending` - Certificate is being validated
+  - `valid` - Certificate is active and usable
+  - `error` - Certificate validation failed
+
+### Validity Period
+
+- **NotBefore** (`types.RelativeTime`) - Certificate becomes valid (certificates.go:54)
+- **NotAfter** (`types.RelativeTime`) - Certificate expires (certificates.go:55)
+- **Created** (`types.RelativeTime`) - When uploaded to Unikraft (certificates.go:53)
+
+## Certificate Lifecycle
+
+### Creating a Certificate
+
+First, generate a certificate and private key:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=demo.unikraft.dev" \
+  -keyout cert.key \
+  -out cert.pem
+```
+
+Then upload to Unikraft Cloud:
+
+```bash
+unikraft certificate create \
+  --set name=demo-cert \
+  --set cn=demo.unikraft.dev. \
+  --set-file chain=cert.pem \
+  --set-file pkey=cert.key \
+  --set metro=fra
+```
+
+<Note>
+  The `cn` field must match the Common Name in your certificate and should end with a `.` to indicate it's fully qualified.
+</Note>
+
+### Certificate Fields on Create
+
+When creating certificates, provide these fields (certificates.go:41-43):
+
+- **CN** (`string`) - Common name (must match certificate)
+- **Chain** (`string`) - PEM-encoded certificate chain
+- **PrivateKey** (`string`) - PEM-encoded private key
+
+### Inspecting a Certificate
+
+```bash
+unikraft certificate get demo-cert
+```
+
+View detailed information including:
+- Validity period (not before/after)
+- Issuer and subject
+- Certificate state
+- Serial number
+
+### Deleting a Certificate
+
+```bash
+unikraft certificate delete demo-cert
+```
+
+<Warning>
+  Deleting a certificate in use by service groups will break HTTPS for those domains. Ensure services are updated before deletion.
+</Warning>
+
+## Common Use Cases
+
+### Custom Domain with Let's Encrypt
+
+Use Let's Encrypt or another CA to obtain a certificate:
+
+```bash
+# Get certificate from Let's Encrypt (using certbot or similar)
+certbot certonly --manual -d myapp.example.com
+
+# Upload to Unikraft
+unikraft certificate create \
+  --set name=myapp-cert \
+  --set cn=myapp.example.com. \
+  --set-file chain=/etc/letsencrypt/live/myapp.example.com/fullchain.pem \
+  --set-file pkey=/etc/letsencrypt/live/myapp.example.com/privkey.pem \
+  --set metro=fra
+
+# Use with service group
+unikraft service create \
+  --set name=myapp \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set domains=name=myapp.example.com.
+```
+
+The certificate is automatically matched to the domain based on the CN.
+
+### Wildcard Certificate
+
+Use a wildcard certificate for multiple subdomains:
+
+```bash
+# Generate wildcard certificate
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=*.example.com" \
+  -keyout wildcard.key \
+  -out wildcard.pem
+
+# Upload to Unikraft
+unikraft certificate create \
+  --set name=wildcard-cert \
+  --set cn=*.example.com. \
+  --set-file chain=wildcard.pem \
+  --set-file pkey=wildcard.key \
+  --set metro=fra
+
+# Use with multiple domains
+unikraft service create \
+  --set name=service-a \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set domains=name=app1.example.com.
+
+unikraft service create \
+  --set name=service-b \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set domains=name=app2.example.com.
+```
+
+### Self-Signed Certificate for Development
+
+For testing and development:
+
+```bash
+# Generate self-signed certificate
+openssl req -x509 -newkey rsa:2048 -sha256 -days 30 -nodes \
+  -subj "/CN=dev.local" \
+  -keyout dev.key \
+  -out dev.pem
+
+# Upload to Unikraft
+unikraft certificate create \
+  --set name=dev-cert \
+  --set cn=dev.local. \
+  --set-file chain=dev.pem \
+  --set-file pkey=dev.key \
+  --set metro=fra
+```
+
+<Warning>
+  Self-signed certificates will trigger browser warnings. Only use for development and testing.
+</Warning>
+
+### Multi-Region Certificate Deployment
+
+Deploy the same certificate across multiple metros:
+
+```bash
+# Upload to first metro
+unikraft certificate create \
+  --set name=global-cert \
+  --set cn=myapp.example.com. \
+  --set-file chain=cert.pem \
+  --set-file pkey=cert.key \
+  --set metro=fra
+
+# Upload to second metro
+unikraft certificate create \
+  --set name=global-cert \
+  --set cn=myapp.example.com. \
+  --set-file chain=cert.pem \
+  --set-file pkey=cert.key \
+  --set metro=ewr
+```
+
+<Info>
+  Certificates are metro-specific. Upload the same certificate to each metro where you need HTTPS.
+</Info>
+
+## Certificate Validation
+
+When you upload a certificate, Unikraft validates:
+
+1. **Format**: Certificate and key must be valid PEM
+2. **Matching**: Private key must match the certificate
+3. **Expiration**: Certificate must not be expired
+4. **Chain**: Certificate chain must be complete
+
+If validation fails, the certificate state will be `error`.
+
+## Certificate Chain Requirements
+
+The certificate chain should include:
+
+1. **Server certificate** (your domain certificate)
+2. **Intermediate certificates** (CA chain)
+3. **Root certificate** (optional, usually not needed)
+
+**Example chain format:**
+```pem
+-----BEGIN CERTIFICATE-----
+[Your server certificate]
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+[Intermediate CA certificate]
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+[Root CA certificate - optional]
+-----END CERTIFICATE-----
+```
+
+## Automatic Certificate Matching
+
+Certificates are automatically matched to domains in service groups:
+
+1. Service group domain: `myapp.example.com`
+2. Certificate CN: `myapp.example.com` or `*.example.com`
+3. Match: Certificate is used for TLS termination
+
+No manual linking is required—matching is based on the CN field.
+
+## Certificate Renewal
+
+To renew an expiring certificate:
+
+1. Obtain a new certificate from your CA
+2. Delete the old certificate: `unikraft certificate delete old-cert`
+3. Upload the new certificate with the same CN
+4. Service groups automatically use the new certificate
+
+<Tip>
+  Monitor the `NotAfter` field and set up alerts for expiring certificates. Automate renewal using your CI/CD pipeline.
+</Tip>
+
+## Relationship to Other Resources
+
+<CardGroup cols={2}>
+  <Card title="Services" icon="network-wired" href="/core-concepts/services">
+    Certificates enable HTTPS for service group domains
+  </Card>
+  <Card title="Metros" icon="globe" href="/core-concepts/metros">
+    Certificates are stored in specific metros
+  </Card>
+</CardGroup>
+
+<Note>
+  Unikraft-managed domains (e.g., `*.fra.unikraft.cloud`) have automatic certificates. You only need to upload certificates for custom domains.
+</Note>
+
+## Security Best Practices
+
+- **Strong Keys**: Use RSA 2048-bit or higher, or ECDSA P-256 or higher
+- **Certificate Rotation**: Renew certificates before expiration
+- **Private Key Security**: Never commit private keys to version control
+- **Trusted CAs**: Use certificates from trusted certificate authorities
+- **Monitor Expiration**: Set up alerts 30 days before expiration

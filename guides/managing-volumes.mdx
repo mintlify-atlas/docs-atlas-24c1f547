@@ -1,0 +1,567 @@
+---
+title: Managing Volumes
+description: Create and manage persistent storage volumes for your Unikraft Cloud instances
+---
+
+Volumes provide persistent block storage for unikernel instances on Unikraft Cloud. Unlike instance storage, volumes persist beyond the lifecycle of individual instances and can be attached, detached, and reattached as needed.
+
+## Understanding Volumes
+
+Unikraft Cloud volumes are:
+
+- **Persistent**: Data survives instance termination
+- **Metro-specific**: Volumes exist within a single metro
+- **Attachable**: Can be mounted to multiple instances
+- **Resizable**: Size can be increased after creation
+- **Snapshottable**: Can be cloned for backups or duplication
+
+## Creating Volumes
+
+Create a new volume in a specific metro:
+
+```bash
+unikraft volumes create \
+  --set name=my-data \
+  --set size=10GiB \
+  --set metro=fra
+```
+
+### Size Formats
+
+Volume sizes can be specified in multiple formats:
+
+<CodeGroup>
+```bash MiB (Mebibytes)
+unikraft volumes create \
+  --set name=small-volume \
+  --set size=512MiB \
+  --set metro=fra
+```
+
+```bash GiB (Gibibytes)
+unikraft volumes create \
+  --set name=medium-volume \
+  --set size=10GiB \
+  --set metro=fra
+```
+
+```bash MB/GB (Metric)
+unikraft volumes create \
+  --set name=large-volume \
+  --set size=100GB \
+  --set metro=fra
+```
+</CodeGroup>
+
+### Multiple Volumes
+
+Create several volumes at once:
+
+<Steps>
+  <Step title="Create application data volume">
+    ```bash
+    unikraft volumes create \
+      --set name=app-data \
+      --set size=50GiB \
+      --set metro=fra
+    ```
+  </Step>
+
+  <Step title="Create cache volume">
+    ```bash
+    unikraft volumes create \
+      --set name=app-cache \
+      --set size=10GiB \
+      --set metro=fra
+    ```
+  </Step>
+
+  <Step title="Create logs volume">
+    ```bash
+    unikraft volumes create \
+      --set name=app-logs \
+      --set size=20GiB \
+      --set metro=fra
+    ```
+  </Step>
+</Steps>
+
+## Listing Volumes
+
+View all volumes across all metros:
+
+```bash
+unikraft volumes list
+```
+
+Example output:
+
+```
+METRO  NAME        UUID                                  STATE   SIZE
+fra    app-data    550e8400-e29b-41d4-a716-446655440000  ready   50GiB
+fra    app-cache   6ba7b810-9dad-11d1-80b4-00c04fd430c8  ready   10GiB
+sfo    backup-vol  6ba7b811-9dad-11d1-80b4-00c04fd430c9  ready   100GiB
+```
+
+### Filter by Metro
+
+To see volumes in a specific metro, filter the output:
+
+```bash
+unikraft volumes list | grep fra
+```
+
+### JSON Output
+
+Get volume information in JSON format:
+
+```bash
+unikraft volumes list -o json
+```
+
+## Inspecting Volumes
+
+View detailed information about a specific volume:
+
+```bash
+unikraft volumes get my-data
+```
+
+Example output:
+
+```
+METRO      fra
+NAME       my-data
+UUID       550e8400-e29b-41d4-a716-446655440000
+STATE      ready
+SIZE       50GiB
+CREATED    2 hours ago
+ATTACHED   instance-1, instance-2
+MOUNTED    instance-1:/data (rw), instance-2:/backup (ro)
+```
+
+### Specific Fields
+
+Display only selected fields:
+
+```bash
+unikraft volumes get my-data --fields name,state,size
+```
+
+## Attaching Volumes to Instances
+
+### During Instance Creation
+
+Attach a volume when deploying an instance:
+
+```bash
+unikraft run --metro fra \
+  -v my-data:/data \
+  my-app:latest
+```
+
+### Attach Existing Volume
+
+Attach a volume to a running instance:
+
+```bash
+unikraft instances edit my-instance \
+  --add volumes=my-data:/data
+```
+
+### Read-Only Attachment
+
+Attach a volume in read-only mode:
+
+```bash
+unikraft run --metro fra \
+  -v config-data:/etc/config:ro \
+  my-app:latest
+```
+
+### Multiple Mount Points
+
+Attach multiple volumes to a single instance:
+
+```bash
+unikraft run --metro fra \
+  -v app-data:/data \
+  -v app-cache:/cache \
+  -v app-logs:/var/log \
+  my-app:latest
+```
+
+## Detaching Volumes
+
+Remove a volume from an instance:
+
+```bash
+unikraft instances edit my-instance \
+  --del volumes=my-data
+```
+
+<Warning>
+  Ensure the application is not actively using the volume before detaching to prevent data corruption.
+</Warning>
+
+## Resizing Volumes
+
+Increase the size of an existing volume:
+
+```bash
+unikraft volumes edit my-data \
+  --set size=100GiB
+```
+
+<Info>
+  Volumes can only be **increased** in size, not decreased. Plan capacity accordingly.
+</Info>
+
+### Resize Workflow
+
+<Steps>
+  <Step title="Check current size">
+    ```bash
+    unikraft volumes get my-data --fields size
+    ```
+  </Step>
+
+  <Step title="Resize the volume">
+    ```bash
+    unikraft volumes edit my-data --set size=200GiB
+    ```
+  </Step>
+
+  <Step title="Verify new size">
+    ```bash
+    unikraft volumes get my-data --fields size
+    ```
+  </Step>
+
+  <Step title="Expand filesystem (if needed)">
+    Some filesystems require manual expansion after volume resize. Consult your unikernel's documentation.
+  </Step>
+</Steps>
+
+## Cloning Volumes
+
+Create a copy of an existing volume:
+
+```bash
+unikraft volumes clone my-data \
+  --set name=my-data-backup
+```
+
+### Clone Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Backups" icon="clock">
+    Create point-in-time snapshots:
+    ```bash
+    unikraft volumes clone prod-data \
+      --set name=prod-data-$(date +%Y%m%d)
+    ```
+  </Card>
+
+  <Card title="Testing" icon="flask">
+    Clone production data for testing:
+    ```bash
+    unikraft volumes clone prod-data \
+      --set name=test-data
+    ```
+  </Card>
+
+  <Card title="Migration" icon="truck">
+    Copy data to another metro (attach, copy, detach):
+    ```bash
+    unikraft volumes clone fra-data \
+      --set name=sfo-data
+    ```
+  </Card>
+
+  <Card title="Scaling" icon="arrows-split-up-and-left">
+    Duplicate data for multiple instances:
+    ```bash
+    unikraft volumes clone shared-config \
+      --set name=instance-2-config
+    ```
+  </Card>
+</CardGroup>
+
+### Clone with Tags
+
+Add tags to cloned volumes for organization:
+
+```bash
+unikraft volumes clone my-data \
+  --set name=my-data-backup \
+  --set tags=backup,daily,automated
+```
+
+## Deleting Volumes
+
+Remove a volume permanently:
+
+```bash
+unikraft volumes delete my-data
+```
+
+<Warning>
+  Volume deletion is **irreversible**. Ensure you have backups before deleting volumes.
+</Warning>
+
+### Delete Multiple Volumes
+
+```bash
+unikraft volumes delete volume-1 volume-2 volume-3
+```
+
+### Safe Deletion Workflow
+
+<Steps>
+  <Step title="Verify volume is not in use">
+    ```bash
+    unikraft volumes get my-data --fields attached,mounted
+    ```
+  </Step>
+
+  <Step title="Create backup if needed">
+    ```bash
+    unikraft volumes clone my-data --set name=my-data-backup
+    ```
+  </Step>
+
+  <Step title="Delete the volume">
+    ```bash
+    unikraft volumes delete my-data
+    ```
+  </Step>
+
+  <Step title="Verify deletion">
+    ```bash
+    unikraft volumes list | grep my-data
+    ```
+  </Step>
+</Steps>
+
+## Volume States
+
+Volumes transition through different states:
+
+| State | Description | Can Attach? |
+|-------|-------------|-------------|
+| `creating` | Volume is being provisioned | No |
+| `ready` | Volume is available for use | Yes |
+| `attached` | Volume is attached to instance(s) | Yes |
+| `detaching` | Volume is being detached | No |
+| `resizing` | Volume size is being changed | No |
+| `error` | Volume encountered an error | No |
+
+## Common Workflows
+
+### Database Storage
+
+<CodeGroup>
+```bash PostgreSQL
+# Create database volume
+unikraft volumes create \
+  --set name=postgres-data \
+  --set size=50GiB \
+  --set metro=fra
+
+# Deploy PostgreSQL with volume
+unikraft run --metro fra \
+  --name postgres \
+  -v postgres-data:/var/lib/postgresql/data \
+  -e POSTGRES_PASSWORD=secret \
+  postgres:latest
+```
+
+```bash Redis
+# Create cache volume
+unikraft volumes create \
+  --set name=redis-data \
+  --set size=10GiB \
+  --set metro=fra
+
+# Deploy Redis with persistence
+unikraft run --metro fra \
+  --name redis \
+  -v redis-data:/data \
+  redis:latest --appendonly yes
+```
+</CodeGroup>
+
+### Application Data Separation
+
+```bash
+# Create separate volumes for different data types
+unikraft volumes create --set name=app-uploads --set size=100GiB --set metro=fra
+unikraft volumes create --set name=app-cache --set size=20GiB --set metro=fra
+unikraft volumes create --set name=app-logs --set size=30GiB --set metro=fra
+
+# Deploy application with all volumes
+unikraft run --metro fra \
+  --name web-app \
+  -v app-uploads:/uploads \
+  -v app-cache:/cache \
+  -v app-logs:/var/log/app \
+  web-app:latest
+```
+
+### Backup and Restore
+
+<Steps>
+  <Step title="Create backup clone">
+    ```bash
+    unikraft volumes clone production-data \
+      --set name=backup-$(date +%Y%m%d-%H%M%S)
+    ```
+  </Step>
+
+  <Step title="List backups">
+    ```bash
+    unikraft volumes list | grep backup
+    ```
+  </Step>
+
+  <Step title="Restore from backup">
+    ```bash
+    # Detach current volume
+    unikraft instances edit my-app --del volumes=production-data
+
+    # Attach backup volume
+    unikraft instances edit my-app --add volumes=backup-20260309:/data
+    ```
+  </Step>
+</Steps>
+
+### Shared Configuration
+
+Share read-only configuration across multiple instances:
+
+```bash
+# Create configuration volume
+unikraft volumes create \
+  --set name=shared-config \
+  --set size=1GiB \
+  --set metro=fra
+
+# Deploy multiple instances with shared config
+unikraft run --metro fra --name app-1 -v shared-config:/etc/config:ro my-app:latest
+unikraft run --metro fra --name app-2 -v shared-config:/etc/config:ro my-app:latest
+unikraft run --metro fra --name app-3 -v shared-config:/etc/config:ro my-app:latest
+```
+
+## Monitoring Volume Usage
+
+### Check Attachments
+
+See which instances are using a volume:
+
+```bash
+unikraft volumes get my-data --fields attached,mounted
+```
+
+### Volume Capacity Planning
+
+```bash
+# List all volumes with sizes
+unikraft volumes list --fields name,size,state
+
+# Sum total volume capacity (using jq)
+unikraft volumes list -o json | jq '[.[] | .size] | add'
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Size Appropriately" icon="ruler">
+    Create volumes with sufficient initial size to minimize resize operations. Consider growth over time.
+  </Card>
+
+  <Card title="Regular Backups" icon="copy">
+    Clone important volumes regularly:
+    ```bash
+    unikraft volumes clone data --set name=data-$(date +%Y%m%d)
+    ```
+  </Card>
+
+  <Card title="Use Descriptive Names" icon="tag">
+    Name volumes clearly: `prod-postgres-data`, `staging-uploads`, `dev-cache`.
+  </Card>
+
+  <Card title="Separate Concerns" icon="layer-group">
+    Use different volumes for different data types (application data, cache, logs).
+  </Card>
+
+  <Card title="Metro Locality" icon="location-dot">
+    Create volumes in the same metro as instances for best performance.
+  </Card>
+
+  <Card title="Read-Only When Possible" icon="lock">
+    Mount configuration and static data as read-only to prevent accidental modifications.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Volume Not Attaching
+
+If a volume fails to attach:
+
+1. **Check volume state**:
+   ```bash
+   unikraft volumes get my-data --fields state
+   ```
+
+2. **Verify metro match**:
+   ```bash
+   unikraft volumes get my-data --fields metro
+   unikraft instances get my-instance --fields metro
+   ```
+
+3. **Check for existing attachments** that might conflict
+
+### Volume Stuck in Creating State
+
+If a volume remains in `creating` state:
+
+```bash
+# Check volume status
+unikraft volumes get my-data
+
+# If stuck for extended period, contact support
+```
+
+### Cannot Resize Volume
+
+Volume resize failures:
+
+1. **Ensure volume is in ready state**
+2. **Verify new size is larger than current size**
+3. **Check quota limits** in your organization
+
+### Clone Failures
+
+If cloning fails:
+
+```bash
+# Verify source volume exists and is ready
+unikraft volumes get source-volume --fields state
+
+# Ensure unique name for clone
+unikraft volumes list | grep clone-name
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Learn how to deploy instances with attached volumes
+  </Card>
+
+  <Card title="Service Groups" icon="network-wired" href="/guides/service-groups">
+    Configure load balancing and networking
+  </Card>
+</CardGroup>

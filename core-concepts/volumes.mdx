@@ -1,0 +1,280 @@
+---
+title: Volumes
+description: Persistent block storage for Unikraft instances
+---
+
+Volumes provide persistent block storage that can be attached to instances. Unlike instance ephemeral storage, volumes persist independently and can be moved between instances.
+
+## What is a Volume?
+
+A volume is a persistent storage unit in a specific metro. It can be attached to instances for storing data that survives instance restarts, upgrades, or migrations. Volumes are attached to instances at specific mount paths and can be read-only or read-write.
+
+## Key Properties
+
+### Identification
+
+- **Name** (`string`) - Human-readable volume name (volumes.go:170)
+- **UUID** (`string`) - Unique identifier (volumes.go:171)
+- **Metro** (`string`) - Geographic location where the volume is stored (volumes.go:169)
+
+### Storage Configuration
+
+- **Size** (`types.SizeMebibytes`) - Volume capacity in mebibytes (volumes.go:176)
+- **Persistent** (`bool`) - Whether the volume persists after detachment (volumes.go:177)
+- **State** (`types.VolumeState`) - Current volume state (volumes.go:175)
+
+### Volume States
+
+The `State` field indicates the volume's current lifecycle phase:
+
+- `uninitialized` - Volume has been created but not initialized
+- `initializing` - Volume is being prepared for use
+- `available` - Volume is ready to attach
+- `idle` - Volume is attached but not mounted
+- `mounted` - Volume is actively mounted to an instance
+- `busy` - Volume is performing an operation
+- `error` - Volume encountered an error
+
+### Attachment Information
+
+Volumes track which instances they're connected to:
+
+- **AttachedTo** (`[]struct`) - Instances with the volume attached (volumes.go:183-186)
+  - `Name` - Instance name
+  - `UUID` - Instance UUID
+- **MountedBy** (`[]struct`) - Instances actively mounting the volume (volumes.go:188-192)
+  - `Name` - Instance name
+  - `UUID` - Instance UUID
+  - `ReadOnly` - Whether mounted read-only
+
+### Timestamps
+
+- **Created** (`types.RelativeTime`) - When the volume was created (volumes.go:180)
+
+## Volume Lifecycle
+
+### Creating a Volume
+
+```bash
+unikraft volume create \
+  --set name=demo-volume \
+  --set size=10 \
+  --set metro=fra
+```
+
+The size is specified in mebibytes (MiB). Common sizes:
+- `10` = 10 MiB
+- `1024` = 1 GiB
+- `10240` = 10 GiB
+
+### Resizing a Volume
+
+Volumes can be expanded (but not shrunk) while attached:
+
+```bash
+unikraft volume edit demo-volume --set size=20
+```
+
+<Note>
+  Volumes can only grow in size. Shrinking requires creating a new volume and copying data.
+</Note>
+
+### Cloning a Volume
+
+Create an exact copy of a volume:
+
+```bash
+unikraft volume clone demo-volume --set name=demo-volume-clone
+```
+
+Cloning is useful for:
+- Creating backups
+- Testing with production data
+- Distributing pre-populated volumes
+
+### Deleting a Volume
+
+```bash
+unikraft volume delete demo-volume
+```
+
+<Warning>
+  Deleting a volume is permanent. Ensure you have backups before deletion.
+</Warning>
+
+## Attaching Volumes to Instances
+
+Volumes are attached when creating instances using the `volumes` field:
+
+### Basic Attachment
+
+```bash
+unikraft instance create \
+  --set name=app \
+  --set image=myapp:latest \
+  --set metro=fra \
+  --set volumes=demo-volume:/data
+```
+
+### Read-Only Mount
+
+```bash
+unikraft instance create \
+  --set name=app \
+  --set image=myapp:latest \
+  --set metro=fra \
+  --set volumes=demo-volume:/data:ro
+```
+
+### Creating a New Volume on Attach
+
+You can create and attach a volume in one step:
+
+```bash
+unikraft instance create \
+  --set name=app \
+  --set image=myapp:latest \
+  --set metro=fra \
+  --set volumes=:/data:size=1024
+```
+
+## Common Use Cases
+
+### Database Storage
+
+Persistent storage for database files:
+
+```bash
+# Create a volume for PostgreSQL data
+unikraft volume create \
+  --set name=postgres-data \
+  --set size=10240 \
+  --set metro=fra
+
+# Attach to PostgreSQL instance
+unikraft instance create \
+  --set name=postgres \
+  --set image=postgres:latest \
+  --set metro=fra \
+  --set volumes=postgres-data:/var/lib/postgresql/data
+```
+
+### Configuration Storage
+
+Store configuration files on a read-only volume:
+
+```bash
+# Create and populate config volume
+unikraft volume create \
+  --set name=app-config \
+  --set size=100 \
+  --set metro=fra
+
+# Mount as read-only
+unikraft instance create \
+  --set name=app \
+  --set image=myapp:latest \
+  --set metro=fra \
+  --set volumes=app-config:/etc/config:ro
+```
+
+### Shared Data Between Instances
+
+Multiple instances can attach the same volume (with appropriate coordination):
+
+```bash
+# Create shared volume
+unikraft volume create \
+  --set name=shared-cache \
+  --set size=5120 \
+  --set metro=fra
+
+# Attach to multiple instances (ensure proper locking)
+unikraft instance create \
+  --set name=worker-1 \
+  --set image=worker:latest \
+  --set metro=fra \
+  --set volumes=shared-cache:/cache
+```
+
+<Warning>
+  When attaching a volume to multiple instances, ensure your application handles concurrent access properly to avoid data corruption.
+</Warning>
+
+### Backup and Recovery
+
+Use cloning for backups:
+
+```bash
+# Clone production volume for backup
+unikraft volume clone prod-data \
+  --set name=prod-data-backup-$(date +%Y%m%d)
+
+# Restore from backup by creating instance with backup volume
+unikraft instance create \
+  --set name=restored-app \
+  --set image=myapp:latest \
+  --set metro=fra \
+  --set volumes=prod-data-backup-20260309:/data
+```
+
+## Volume Format Specification
+
+When specifying volumes in instance creation, use this format:
+
+```
+[NAME|UUID]:<MOUNT_PATH>[:<OPTIONS>]
+```
+
+**Components:**
+- `NAME|UUID` - Volume name or UUID (omit to create new volume)
+- `MOUNT_PATH` - Absolute path inside instance
+- `OPTIONS` - Comma-separated options:
+  - `ro` - Mount read-only
+  - `size=<MiB>` - Size for new volumes
+
+**Examples:**
+```bash
+# Existing volume by name
+data-volume:/data
+
+# Existing volume by UUID
+550e8400-e29b-41d4-a716-446655440000:/data
+
+# Read-only mount
+data-volume:/data:ro
+
+# New volume with size
+:/data:size=1024
+
+# New read-only volume
+:/data:ro,size=512
+```
+
+See instances.go:137-200 for the implementation.
+
+## Relationship to Other Resources
+
+<CardGroup cols={2}>
+  <Card title="Instances" icon="microchip" href="/core-concepts/instances">
+    Volumes attach to instances for persistent storage
+  </Card>
+  <Card title="Metros" icon="globe" href="/core-concepts/metros">
+    Volumes are created in specific metros
+  </Card>
+</CardGroup>
+
+<Info>
+  Volumes can only attach to instances in the same metro. Cross-metro volume access is not supported.
+</Info>
+
+<Tip>
+  Monitor volume state to ensure it's in the `available` or `mounted` state before attaching to instances.
+</Tip>
+
+## Performance Considerations
+
+- Volumes use block storage optimized for low-latency access
+- Read/write performance scales with volume size
+- Multiple mounts should coordinate access to prevent conflicts
+- Resizing is online but may briefly impact performance

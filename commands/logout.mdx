@@ -1,0 +1,103 @@
+---
+title: unikraft logout
+description: Log out from the current Unikraft Cloud profile
+---
+
+## Syntax
+
+```bash
+unikraft logout
+```
+
+## Description
+
+Log out from the current Unikraft Cloud profile by removing the profile from the configuration. This command:
+
+- Deletes the current profile from the configuration file
+- Clears the default profile setting if the logged-out profile was the default
+- Removes the stored authentication token and all associated profile data
+
+After logging out, you'll need to run `unikraft login` again to authenticate with Unikraft Cloud.
+
+## Options
+
+This command has no options.
+
+## Examples
+
+### Basic logout
+
+```bash
+unikraft logout
+```
+
+Logs out from the current profile:
+
+```
+logout successful
+```
+
+### Logout when multiple profiles exist
+
+If you have multiple profiles, logout removes only the current active profile. Other profiles remain available:
+
+```bash
+# Before logout
+unikraft profile list
+# NAME    ACTIVE  METROS
+# myorg   true    fra0, lhr0
+# testorg false   fra0
+
+unikraft logout
+# logout successful
+
+unikraft profile list
+# NAME    ACTIVE  METROS
+# testorg false   fra0
+```
+
+After logout, you can switch to another profile using `unikraft profile use` or log in again.
+
+### Complete cleanup
+
+To remove all profiles and start fresh:
+
+```bash
+# Logout from current profile
+unikraft logout
+
+# Switch to any remaining profiles and logout
+unikraft profile use testorg
+unikraft logout
+```
+
+## Error Handling
+
+If no profile is currently active, the command will return an error:
+
+```bash
+unikraft logout
+# Error: no profile found
+```
+
+In this case, you're already logged out and don't need to take further action.
+
+## What Gets Removed
+
+When you logout, the following information is deleted from the configuration:
+
+- Authentication token
+- Organization name
+- Control plane URL
+- Metro (region) endpoints
+- All other profile-specific settings
+
+## Security Note
+
+Logout only removes the local profile configuration. It does not revoke the token on the server side. If you need to revoke access completely, consider rotating your tokens through the Unikraft Cloud dashboard.
+
+## Related Commands
+
+- [`unikraft login`](/commands/login) - Authenticate with Unikraft Cloud
+- [`unikraft profile`](/commands/profile) - Manage and view profiles
+- [`unikraft profile use`](/commands/profile#use) - Switch between profiles

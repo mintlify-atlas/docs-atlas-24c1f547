@@ -1,0 +1,204 @@
+---
+title: 'images'
+description: 'Manage Unikraft Cloud images'
+---
+
+Manage container images in Unikraft Cloud. Images define the application and runtime environment for instances.
+
+## Usage
+
+```bash
+unikraft image [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List images">
+  List all images in the registry. By default, dangling images (images with no tags) are hidden.
+
+  ```bash
+  unikraft image list [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--dangling" type="boolean">
+    Include dangling images with no tags (hidden by default)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # List all images
+  unikraft image list
+  ```
+
+  ```bash
+  # Filter images by reference
+  unikraft image list --filter 'ref~="/nginx"'
+  ```
+
+  ```bash
+  $ unikraft image list
+  REF                                    DIGEST                                     METRO
+  index.unikraft.io/official/nginx:latest sha256:a1b2c3d4...                        fra
+  index.unikraft.io/my-user/my-app:v1.0  sha256:e5f6g7h8...                        lhr
+  ```
+
+  ```bash
+  $ unikraft image list --dangling
+  REF                                    DIGEST              DANGLING  METRO
+  index.unikraft.io/official/nginx:latest sha256:a1b2c3d4...  false     fra
+  index.unikraft.io/official/redis:latest sha256:i9j0k1l2...  true      fra
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect an image">
+  Get detailed information about an image by tag or digest.
+
+  ```bash
+  unikraft image get <ref> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Inspect an image by tag
+  unikraft image get nginx:latest
+  ```
+
+  ```bash
+  $ unikraft image get nginx:latest
+  REF         index.unikraft.io/official/nginx:latest
+  DIGEST      sha256:a1b2c3d4e5f6g7h8...
+  PLATFORM    linux/x86_64
+  ENTRYPOINT  ["/bin/nginx"]
+  CMD         ["-g", "daemon off;"]
+  ```
+</Accordion>
+
+<Accordion title="copy - Copy images">
+  Copy an image from one location to another. This command supports:
+  - Copying between registries
+  - Uploading local images (tar archives) to a remote registry
+  - Downloading remote images to local tar archives
+
+  ```bash
+  unikraft image copy <source> <destination> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Create a copy of an image
+  unikraft image copy index.unikraft.io/official/nginx:latest index.unikraft.io/my-user/my-nginx
+  ```
+
+  ```bash
+  # Upload a local image to a remote registry
+  unikraft image copy ./my-local-image.tar index.unikraft.io/my-user/my-image:1.0.0
+  ```
+
+  ```bash
+  # Download an image from a remote registry
+  unikraft image copy index.unikraft.io/official/redis:latest ./my-redis-image.tar
+  ```
+
+  ```bash
+  $ unikraft image copy index.unikraft.io/official/nginx:latest index.unikraft.io/my-user/my-nginx
+  Copying image...
+  Successfully copied index.unikraft.io/official/nginx:latest to index.unikraft.io/my-user/my-nginx
+  ```
+</Accordion>
+
+## Image References
+
+Image references in Unikraft Cloud follow the standard OCI format:
+
+```
+[REGISTRY/][NAMESPACE/]NAME[:TAG|@DIGEST]
+```
+
+### Components
+
+- `REGISTRY` - Optional registry host (defaults to `index.unikraft.io`)
+- `NAMESPACE` - Optional namespace (defaults to `official` for the default registry)
+- `NAME` - Image name (required)
+- `TAG` - Optional tag (defaults to `latest`)
+- `DIGEST` - Optional content-addressable identifier
+
+### Examples
+
+```bash
+# Short form (uses defaults)
+nginx:latest
+redis
+
+# With namespace
+my-user/my-app:v1.0
+
+# Full reference
+index.unikraft.io/my-user/my-app:v1.0
+
+# With digest
+nginx@sha256:a1b2c3d4e5f6g7h8...
+
+# Metro-specific index
+fra.index.unikraft.io/official/nginx:latest
+```
+
+## Working with Local Images
+
+You can upload and download images as tar archives:
+
+### Upload Local Image
+
+```bash
+# Export image from Docker
+docker save my-app:latest -o my-app.tar
+
+# Upload to Unikraft Cloud
+unikraft image copy ./my-app.tar index.unikraft.io/my-user/my-app:v1.0
+```
+
+### Download Image
+
+```bash
+# Download from Unikraft Cloud
+unikraft image copy index.unikraft.io/official/nginx:latest ./nginx.tar
+
+# Import into Docker
+docker load -i nginx.tar
+```
+
+## Filtering Images
+
+The `list` command supports filtering by reference patterns:
+
+```bash
+# Images containing "nginx"
+unikraft image list --filter 'ref~="/nginx"'
+
+# Images in a specific namespace
+unikraft image list --filter 'ref~="/my-user/"'
+
+# Images with specific tag
+unikraft image list --filter 'ref~=":v1"'
+```
+
+## Dangling Images
+
+Dangling images are images that have no tags. They typically occur when:
+- An image is built but not tagged
+- A new image is pushed with a tag that was previously used
+- Tags are explicitly removed
+
+By default, `unikraft image list` hides dangling images. Use the `--dangling` flag to show them:
+
+```bash
+unikraft image list --dangling
+```
+
+## See Also
+
+- [instances](/commands/instances) - Create instances from images

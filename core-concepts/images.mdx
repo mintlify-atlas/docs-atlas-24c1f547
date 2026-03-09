@@ -1,0 +1,363 @@
+---
+title: Images
+description: Container and unikernel images for running instances
+---
+
+Images are the packaged applications that run on Unikraft instances. They contain the unikernel, application code, dependencies, and configuration needed to execute.
+
+## What is an Image?
+
+An image is a versioned, immutable package stored in a container registry. Images follow OCI (Open Container Initiative) standards and can be:
+
+- **Unikraft unikernels**: Purpose-built, minimal images
+- **Container images**: Compatible images from Docker Hub or other registries
+- **Custom builds**: Your own applications packaged as images
+
+## Key Properties
+
+### Image References
+
+- **Ref** (`types.ImageRef`) - Full image reference with tag (images.go:60, 157)
+  - Format: `registry/namespace/name:tag`
+  - Example: `index.unikraft.io/official/nginx:latest`
+- **Digest** (`digest.Digest`) - Content-addressable hash (images.go:61, 159)
+  - Format: `sha256:abc123...`
+  - Ensures exact image version
+
+### Configuration
+
+Image configuration defines runtime behavior (images.go:68-76):
+
+- **Platform** (`string`) - Target architecture and OS
+  - Example: `linux/x86_64/unikraft`
+- **Entrypoint** (`[]string`) - Default command to execute
+- **Cmd** (`[]string`) - Default arguments to entrypoint
+- **Env** (`[]string`) - Default environment variables
+- **ExposedPorts** (`[]string`) - Ports the application listens on
+- **Volumes** (`[]string`) - Mount points for volumes
+
+### Image Metadata (Registry Images)
+
+For images in the Unikraft registry (images.go:154-168):
+
+- **Refs** (`[]types.ImageRef`) - All tags pointing to this image
+- **Namespace** (`string`) - Repository namespace (e.g., `official`, `my-user`)
+- **Dangling** (`bool`) - Whether the image has no tags
+- **Metro** (`string`) - Metro where the image is stored
+
+## Image Lifecycle
+
+### Listing Images
+
+```bash
+# List all images
+unikraft image list
+
+# Filter by reference pattern
+unikraft image list --filter 'ref~="/nginx"'
+
+# Include dangling images (no tags)
+unikraft image list --dangling
+```
+
+<Note>
+  Dangling images are hidden by default. Use `--dangling` to show images with no tags.
+</Note>
+
+### Inspecting an Image
+
+```bash
+unikraft image get nginx:latest
+```
+
+View detailed information including:
+- Platform and architecture
+- Entrypoint and command
+- Environment variables
+- Exposed ports
+- Image digest
+
+### Copying Images
+
+Copy images between registries or to/from local storage:
+
+```bash
+# Copy from Unikraft registry to local file
+unikraft image copy \
+  index.unikraft.io/official/redis:latest \
+  ./my-redis-image.tar
+
+# Upload local image to registry
+unikraft image copy \
+  ./my-local-image.tar \
+  index.unikraft.io/my-user/my-image:1.0.0
+
+# Copy between registries
+unikraft image copy \
+  index.unikraft.io/official/nginx:latest \
+  index.unikraft.io/my-user/my-nginx:latest
+```
+
+## Image Registries
+
+### Unikraft Official Registry
+
+The default registry for official Unikraft images:
+
+```
+index.unikraft.io/official/<name>:<tag>
+```
+
+**Examples:**
+- `index.unikraft.io/official/nginx:latest`
+- `index.unikraft.io/official/redis:7.0`
+- `index.unikraft.io/official/postgres:15`
+
+### User Namespaces
+
+Your private images use your user namespace:
+
+```
+index.unikraft.io/<username>/<name>:<tag>
+```
+
+**Examples:**
+- `index.unikraft.io/my-user/my-app:v1.0`
+- `index.unikraft.io/my-user/api-service:latest`
+
+### Metro-Specific Registries
+
+Each metro has its own registry endpoint:
+
+```
+<metro>.index.unikraft.io/<namespace>/<name>:<tag>
+```
+
+**Examples:**
+- `fra.index.unikraft.io/official/nginx:latest`
+- `ewr.index.unikraft.io/my-user/my-app:v1.0`
+
+<Info>
+  Metro-specific registries provide lower latency for image pulls. Images are automatically mirrored to metros where instances run.
+</Info>
+
+## Image Naming and Tags
+
+### Default Behaviors
+
+When you reference an image, defaults are applied:
+
+```bash
+# Short reference
+nginx:latest
+
+# Expands to
+index.unikraft.io/official/nginx:latest
+```
+
+**Default rules:**
+- Missing registry → `index.unikraft.io`
+- Missing namespace → `official`
+- Missing tag → `latest`
+
+See images.go:374-388 for the implementation.
+
+### Version Tags
+
+Common tagging patterns:
+
+```bash
+# Latest stable
+myapp:latest
+
+# Semantic versioning
+myapp:1.0.0
+myapp:1.0
+myapp:1
+
+# Git commit SHA
+myapp:a1b2c3d
+
+# Environment-specific
+myapp:production
+myapp:staging
+```
+
+### Multiple Tags
+
+A single image can have multiple tags:
+
+```bash
+# All point to the same image (same digest)
+myapp:latest
+myapp:1.2.3
+myapp:stable
+```
+
+View all tags with:
+```bash
+unikraft image get myapp:latest -o json | jq '.refs'
+```
+
+## Using Images with Instances
+
+### Basic Instance Creation
+
+```bash
+unikraft instance create \
+  --set name=web \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set resources.memory=128 \
+  --set resources.vcpus=1
+```
+
+### Override Entrypoint and Args
+
+Customize the image's default behavior:
+
+```bash
+unikraft instance create \
+  --set name=custom \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set runtime.args="-g,daemon off;" \
+  --set runtime.env=DEBUG=1
+```
+
+### Digest-Based Deployment
+
+Use digests for immutable deployments:
+
+```bash
+# Get the digest
+unikraft image get myapp:1.0.0 -o json | jq -r '.digest'
+# Output: sha256:abc123...
+
+# Deploy with digest
+unikraft instance create \
+  --set name=app \
+  --set metro=fra \
+  --set image=myapp@sha256:abc123...
+```
+
+<Tip>
+  Using digests ensures the exact same image is deployed every time, even if tags are updated.
+</Tip>
+
+## Common Use Cases
+
+### Running Official Images
+
+Use pre-built Unikraft images:
+
+```bash
+# Web servers
+unikraft instance create --set image=nginx:latest --set metro=fra
+unikraft instance create --set image=caddy:latest --set metro=fra
+
+# Databases
+unikraft instance create --set image=postgres:15 --set metro=fra
+unikraft instance create --set image=redis:7.0 --set metro=fra
+
+# Languages and runtimes
+unikraft instance create --set image=node:20 --set metro=fra
+unikraft instance create --set image=python:3.11 --set metro=fra
+```
+
+### Deploying Custom Applications
+
+Build and push your own images:
+
+```bash
+# Build locally (using Dockerfile or kraft)
+kraft build -t myapp:1.0.0
+
+# Copy to Unikraft registry
+unikraft image copy \
+  ./myapp:1.0.0 \
+  index.unikraft.io/my-user/myapp:1.0.0
+
+# Deploy
+unikraft instance create \
+  --set name=myapp \
+  --set metro=fra \
+  --set image=my-user/myapp:1.0.0
+```
+
+### Multi-Architecture Images
+
+Images can support multiple platforms:
+
+```bash
+# View platform
+unikraft image get myapp:latest -f +config.platform
+
+# Outputs: linux/x86_64/unikraft
+```
+
+Unikraft automatically selects the correct platform variant.
+
+### Local Development with Images
+
+Export and import for local testing:
+
+```bash
+# Export from registry to local file
+unikraft image copy \
+  index.unikraft.io/official/nginx:latest \
+  ./nginx.tar
+
+# Modify locally (extract, edit, repackage)
+tar -xf nginx.tar
+# ... make changes ...
+tar -cf nginx-modified.tar *
+
+# Upload modified image
+unikraft image copy \
+  ./nginx-modified.tar \
+  index.unikraft.io/my-user/nginx-custom:latest
+```
+
+## Image Storage and Caching
+
+### Registry Storage
+
+- Images are stored in OCI-compliant registries
+- Each metro has a local registry cache
+- Images are pulled on first instance creation
+- Subsequent instances use cached layers
+
+### Layer Deduplication
+
+- Image layers are deduplicated across images
+- Shared base layers are stored once
+- Reduces storage and speeds up pulls
+
+## Relationship to Other Resources
+
+<CardGroup cols={2}>
+  <Card title="Instances" icon="microchip" href="/core-concepts/instances">
+    Instances run from images
+  </Card>
+  <Card title="Metros" icon="globe" href="/core-concepts/metros">
+    Images are cached in metros for fast pulls
+  </Card>
+</CardGroup>
+
+<Note>
+  When creating instances, Unikraft automatically pulls images from the registry. Ensure your image exists before creating instances.
+</Note>
+
+<Tip>
+  Tag your images with semantic versions and use digests for production deployments to ensure reproducibility.
+</Tip>
+
+## Image Best Practices
+
+- **Use specific tags**: Avoid `:latest` in production
+- **Minimize size**: Smaller images boot faster
+- **Version consistently**: Use semantic versioning
+- **Test before deploying**: Validate images locally first
+- **Document exposed ports**: Help others understand your image
+- **Set meaningful entrypoints**: Provide good defaults

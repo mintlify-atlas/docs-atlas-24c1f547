@@ -1,0 +1,502 @@
+---
+title: Shell Completion
+description: Enable tab completion for the Unikraft CLI in your shell
+---
+
+The Unikraft CLI supports shell completion for Bash, Zsh, Fish, and PowerShell. Tab completion helps you:
+
+- Discover available commands and subcommands
+- Complete command names and flags automatically
+- Reduce typing and avoid typos
+- Access inline help for command options
+
+## Quick Setup
+
+Choose your shell and follow the instructions:
+
+<Tabs>
+  <Tab title="Bash">
+    ### Linux
+
+    ```bash
+    # Generate and install completion script
+    unikraft completion bash | sudo tee /etc/bash_completion.d/unikraft > /dev/null
+    
+    # Reload your shell
+    source ~/.bashrc
+    ```
+
+    ### macOS
+
+    ```bash
+    # Install bash-completion if not already installed
+    brew install bash-completion@2
+    
+    # Generate and install completion script
+    unikraft completion bash > $(brew --prefix)/etc/bash_completion.d/unikraft
+    
+    # Reload your shell
+    source ~/.bash_profile
+    ```
+
+    ### User-level Installation (No sudo)
+
+    ```bash
+    # Create completion directory
+    mkdir -p ~/.local/share/bash-completion/completions
+    
+    # Generate completion script
+    unikraft completion bash > ~/.local/share/bash-completion/completions/unikraft
+    
+    # Add to your ~/.bashrc
+    echo 'source ~/.local/share/bash-completion/completions/unikraft' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+  </Tab>
+
+  <Tab title="Zsh">
+    ### Standard Installation
+
+    ```zsh
+    # Generate completion script
+    unikraft completion zsh > "${fpath[1]}/_unikraft"
+    
+    # Reload completions
+    compinit
+    ```
+
+    ### User-level Installation
+
+    ```zsh
+    # Create completion directory
+    mkdir -p ~/.zsh/completion
+    
+    # Generate completion script
+    unikraft completion zsh > ~/.zsh/completion/_unikraft
+    
+    # Add to your ~/.zshrc (if not already present)
+    cat >> ~/.zshrc << 'EOF'
+# Enable completion system
+fpath=(~/.zsh/completion $fpath)
+autoload -Uz compinit
+compinit
+EOF
+    
+    # Reload your shell
+    source ~/.zshrc
+    ```
+
+    ### Oh My Zsh
+
+    ```zsh
+    # Create custom completions directory
+    mkdir -p ~/.oh-my-zsh/custom/completions
+    
+    # Generate completion script
+    unikraft completion zsh > ~/.oh-my-zsh/custom/completions/_unikraft
+    
+    # Add to fpath in ~/.zshrc (before Oh My Zsh is sourced)
+    echo 'fpath=(~/.oh-my-zsh/custom/completions $fpath)' >> ~/.zshrc
+    
+    # Reload your shell
+    source ~/.zshrc
+    ```
+  </Tab>
+
+  <Tab title="Fish">
+    ### Standard Installation
+
+    ```fish
+    # Generate and install completion script
+    unikraft completion fish > ~/.config/fish/completions/unikraft.fish
+    ```
+
+    Completions are automatically loaded by Fish. No need to reload your shell.
+
+    ### System-wide Installation
+
+    ```fish
+    # Generate and install system-wide (requires sudo)
+    unikraft completion fish | sudo tee /usr/share/fish/vendor_completions.d/unikraft.fish > /dev/null
+    ```
+  </Tab>
+
+  <Tab title="PowerShell">
+    ### Windows PowerShell / PowerShell Core
+
+    ```powershell
+    # Generate completion script
+    unikraft completion powershell > unikraft.ps1
+    
+    # Move to PowerShell modules directory
+    $modulePath = "$HOME\Documents\PowerShell\Modules\UnikraftCompletion"
+    New-Item -ItemType Directory -Force -Path $modulePath
+    Move-Item unikraft.ps1 "$modulePath\UnikraftCompletion.psm1"
+    
+    # Add to your PowerShell profile
+    Add-Content $PROFILE "`nImport-Module UnikraftCompletion"
+    
+    # Reload profile
+    . $PROFILE
+    ```
+
+    ### Alternative: Direct Loading
+
+    ```powershell
+    # Generate completion script
+    unikraft completion powershell | Out-File -FilePath $HOME\unikraft.ps1
+    
+    # Add to your PowerShell profile
+    Add-Content $PROFILE "`n. $HOME\unikraft.ps1"
+    
+    # Reload profile
+    . $PROFILE
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+If you don't have a shell profile file (`.bashrc`, `.zshrc`, etc.), create one first:
+
+```bash
+touch ~/.bashrc  # or ~/.zshrc for Zsh
+```
+</Note>
+
+## Verifying Installation
+
+After installation, verify that completion works:
+
+```bash
+# Type the following and press TAB
+unikraft <TAB>
+
+# Should show available commands:
+# instances  volumes  services  certificates  images  metros  login  logout  profile  completion
+```
+
+### Testing Subcommand Completion
+
+```bash
+# Complete subcommands
+unikraft instances <TAB>
+# Shows: list  get  create  edit  delete  logs  start  stop  restart
+
+# Complete flags
+unikraft run --<TAB>
+# Shows: --metro  --name  --memory  --vcpus  --env  --volume  --port  --scale-to-zero
+```
+
+<Tip>
+If completion doesn't work immediately:
+
+1. **Restart your shell** or open a new terminal window
+2. **Check permissions** on the completion file:
+   ```bash
+   ls -l /etc/bash_completion.d/unikraft
+   ```
+3. **Verify the completion script was generated** correctly:
+   ```bash
+   unikraft completion bash | head -n 5
+   ```
+</Tip>
+
+## Using Tab Completion
+
+### Command Completion
+
+Press `TAB` after typing `unikraft` to see all available commands:
+
+```bash
+unikraft <TAB>
+```
+
+### Subcommand Completion
+
+Press `TAB` after a command to see its subcommands:
+
+```bash
+unikraft instances <TAB>
+unikraft volumes <TAB>
+unikraft services <TAB>
+```
+
+### Flag Completion
+
+Press `TAB` after `--` to see available flags:
+
+```bash
+unikraft run --<TAB>
+unikraft instances list --<TAB>
+```
+
+### Profile Completion
+
+Some shells support dynamic completion of profile names:
+
+```bash
+unikraft --profile=<TAB>
+# Shows: default  staging  production
+
+unikraft profile use <TAB>
+# Shows available profiles from your config
+```
+
+### Metro Completion
+
+Complete metro names from available metros:
+
+```bash
+unikraft run --metro=<TAB>
+# Shows: fra  sfo  dal  sin  was  lhr
+```
+
+## Advanced Configuration
+
+### Bash: Customizing Completion Behavior
+
+Add to your `~/.bashrc` to customize completion:
+
+```bash
+# Case-insensitive completion
+bind 'set completion-ignore-case on'
+
+# Show all completions immediately
+bind 'set show-all-if-ambiguous on'
+
+# Cycle through completions with TAB
+bind 'TAB:menu-complete'
+```
+
+### Zsh: Completion Styling
+
+Add to your `~/.zshrc` for enhanced completion:
+
+```zsh
+# Enable menu selection
+zstyle ':completion:*' menu select
+
+# Case-insensitive completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# Colorful completion
+zstyle ':completion:*' list-colors '${(s.:.)LS_COLORS}'
+
+# Group completions by category
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%B%d%b'
+```
+
+### Fish: Completion Customization
+
+Fish completions are automatically styled. You can add custom completions in:
+
+```fish
+~/.config/fish/completions/unikraft.fish
+```
+
+## Updating Completions
+
+When you update the Unikraft CLI, regenerate the completion scripts:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    unikraft completion bash | sudo tee /etc/bash_completion.d/unikraft > /dev/null
+    source ~/.bashrc
+    ```
+  </Tab>
+  
+  <Tab title="Zsh">
+    ```zsh
+    unikraft completion zsh > "${fpath[1]}/_unikraft"
+    rm -f ~/.zcompdump
+    compinit
+    ```
+  </Tab>
+  
+  <Tab title="Fish">
+    ```fish
+    unikraft completion fish > ~/.config/fish/completions/unikraft.fish
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    ```powershell
+    unikraft completion powershell | Out-File -FilePath $HOME\unikraft.ps1
+    . $PROFILE
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Completion Not Working
+
+**1. Check if bash-completion is installed (Bash only):**
+
+```bash
+# Debian/Ubuntu
+sudo apt install bash-completion
+
+# Fedora/RHEL
+sudo dnf install bash-completion
+
+# macOS
+brew install bash-completion@2
+```
+
+**2. Verify completion script exists:**
+
+```bash
+# Bash
+ls -l /etc/bash_completion.d/unikraft
+
+# Zsh
+ls -l "${fpath[1]}/_unikraft"
+
+# Fish
+ls -l ~/.config/fish/completions/unikraft.fish
+```
+
+**3. Check shell configuration:**
+
+```bash
+# Bash - ensure this line exists in ~/.bashrc
+grep bash_completion ~/.bashrc
+
+# Zsh - ensure compinit is called in ~/.zshrc
+grep compinit ~/.zshrc
+```
+
+**4. Regenerate with verbose output:**
+
+```bash
+unikraft completion bash 2>&1 | head -20
+```
+
+### Partial Completion
+
+If only some commands complete:
+
+1. **Update the completion script** (see Updating Completions above)
+2. **Clear completion cache:**
+   ```bash
+   # Zsh
+   rm -f ~/.zcompdump*
+   compinit
+   
+   # Bash
+   complete -r unikraft
+   source /etc/bash_completion.d/unikraft
+   ```
+
+### Slow Completion
+
+If completion is slow, especially with Zsh:
+
+```zsh
+# Add to ~/.zshrc
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
+```
+
+### PowerShell Execution Policy
+
+If you get an execution policy error:
+
+```powershell
+# Check current policy
+Get-ExecutionPolicy
+
+# Set to allow local scripts
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+<Warning>
+Only change the execution policy if you understand the security implications. `RemoteSigned` allows local scripts to run but requires downloaded scripts to be signed.
+</Warning>
+
+## Uninstalling Completion
+
+To remove shell completion:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    # System-wide
+    sudo rm /etc/bash_completion.d/unikraft
+    
+    # User-level
+    rm ~/.local/share/bash-completion/completions/unikraft
+    
+    # Remove from ~/.bashrc if added manually
+    # Edit the file and remove the source line
+    ```
+  </Tab>
+  
+  <Tab title="Zsh">
+    ```zsh
+    # Standard location
+    rm "${fpath[1]}/_unikraft"
+    
+    # User-level
+    rm ~/.zsh/completion/_unikraft
+    
+    # Oh My Zsh
+    rm ~/.oh-my-zsh/custom/completions/_unikraft
+    
+    # Clear cache
+    rm -f ~/.zcompdump*
+    ```
+  </Tab>
+  
+  <Tab title="Fish">
+    ```fish
+    # User-level
+    rm ~/.config/fish/completions/unikraft.fish
+    
+    # System-wide
+    sudo rm /usr/share/fish/vendor_completions.d/unikraft.fish
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    ```powershell
+    # Remove module
+    Remove-Item -Recurse "$HOME\Documents\PowerShell\Modules\UnikraftCompletion"
+    
+    # Or remove direct script
+    Remove-Item "$HOME\unikraft.ps1"
+    
+    # Remove from profile
+    # Edit $PROFILE and remove the Import-Module or source line
+    ```
+  </Tab>
+</Tabs>
+
+## Manual Completion Generation
+
+You can generate completion scripts manually for inspection or customization:
+
+```bash
+# View the generated script
+unikraft completion bash
+
+# Save to a custom location
+unikraft completion bash > /tmp/unikraft-completion.bash
+
+# Inspect the script
+less /tmp/unikraft-completion.bash
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration File" icon="file" href="/configuration/config-file">
+    Learn about the configuration file structure
+  </Card>
+  <Card title="Environment Variables" icon="code" href="/configuration/environment-variables">
+    Customize CLI behavior with environment variables
+  </Card>
+</CardGroup>

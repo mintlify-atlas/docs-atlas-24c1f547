@@ -1,0 +1,333 @@
+---
+title: Metros
+description: Geographic regions for deploying Unikraft resources
+---
+
+Metros are geographic regions where you can deploy Unikraft instances, volumes, and other resources. Each metro is an isolated deployment zone with its own infrastructure and registry.
+
+## What is a Metro?
+
+A metro represents a physical datacenter location. Resources like instances and volumes are metro-specific—they exist in one metro and cannot be directly moved to another.
+
+Metros provide:
+- **Low-latency access** for users in that geographic region
+- **Data residency** for compliance requirements
+- **Isolation** between regions for fault tolerance
+- **Local registries** for fast image pulls
+
+## Key Properties
+
+### Identification
+
+- **Name** (`string`) - Short metro code (metros.go:31)
+  - Examples: `fra` (Frankfurt), `ewr` (Newark), `sin` (Singapore)
+- **Country** (`string`) - Country where the metro is located (metros.go:32)
+  - Examples: `Germany`, `USA`, `Singapore`
+
+### Connectivity
+
+- **Endpoint** (`string`) - API endpoint for this metro (metros.go:33)
+  - Example: `https://fra.kraft.cloud`
+- **Insecure** (`bool`) - Whether to use HTTP instead of HTTPS (metros.go:34)
+
+### Status Information (Long Output)
+
+When viewing metros with verbose output, additional status fields are available (metros.go:166-186):
+
+- **Status.IP** (`[]string`) - Resolved IP addresses for the endpoint
+- **Status.Ping** (`types.PingLatency`) - Round-trip latency to the metro
+- **Status.Online** (`types.MetroStatus`) - Whether the metro is reachable
+  - `online` - Metro is accessible
+  - `offline` - Metro is unreachable
+
+<Note>
+  Status fields are computed on-demand and may add latency to list operations. Use `-f +status` to view them.
+</Note>
+
+## Listing Metros
+
+### Basic List
+
+```bash
+unikraft metro list
+```
+
+Outputs:
+```
+NAME  COUNTRY     ENDPOINT
+fra   Germany     https://fra.kraft.cloud
+ewr   USA         https://ewr.kraft.cloud
+sin   Singapore   https://sin.kraft.cloud
+```
+
+### With Connection Status
+
+```bash
+unikraft metro list -f +status
+```
+
+Outputs additional fields:
+```
+NAME  COUNTRY     ENDPOINT                  STATUS.IP        STATUS.PING  STATUS.ONLINE
+fra   Germany     https://fra.kraft.cloud   203.0.113.10     12ms         online
+ewr   USA         https://ewr.kraft.cloud   203.0.113.20     89ms         online
+sin   Singapore   https://sin.kraft.cloud   203.0.113.30     156ms        online
+```
+
+## Inspecting a Metro
+
+```bash
+unikraft metro get fra
+```
+
+View detailed information about a specific metro including:
+- Endpoint URL
+- IP addresses
+- Connection latency
+- Online status
+
+## Metro Configuration
+
+Metros are configured in your Unikraft profile. View your current profile:
+
+```bash
+unikraft profile list
+```
+
+Metros are defined in the profile configuration with:
+- Name (short code)
+- Country
+- API endpoint
+- Optional TLS settings
+
+## Using Metros
+
+### Choosing a Metro
+
+Select a metro based on:
+
+1. **User location**: Deploy close to your users for low latency
+2. **Data residency**: Meet regulatory requirements
+3. **Redundancy**: Deploy to multiple metros for high availability
+
+**Example:**
+```bash
+# European users
+unikraft instance create --set metro=fra ...
+
+# US East Coast users
+unikraft instance create --set metro=ewr ...
+
+# Asia-Pacific users
+unikraft instance create --set metro=sin ...
+```
+
+### Metro-Specific Resources
+
+All major resources are metro-scoped:
+
+```bash
+# Create volume in Frankfurt
+unikraft volume create --set metro=fra --set name=data --set size=1024
+
+# Create instance in Frankfurt
+unikraft instance create --set metro=fra --set name=app --set image=myapp:latest
+
+# Create service in Frankfurt
+unikraft service create --set metro=fra --set name=web --set services=443:8080/tls+http
+```
+
+<Warning>
+  Resources in different metros cannot directly communicate. Use public endpoints or VPN for cross-metro connectivity.
+</Warning>
+
+## Common Use Cases
+
+### Single-Region Deployment
+
+Deploy all resources in one metro:
+
+```bash
+METRO=fra
+
+# Create volume
+unikraft volume create --set metro=$METRO --set name=db-data --set size=10240
+
+# Create instance
+unikraft instance create \
+  --set metro=$METRO \
+  --set name=postgres \
+  --set image=postgres:15 \
+  --set volumes=db-data:/var/lib/postgresql/data
+
+# Create service
+unikraft service create \
+  --set metro=$METRO \
+  --set name=db-service \
+  --set services=5432:5432/tcp
+```
+
+### Multi-Region Deployment
+
+Deploy identical setups across metros:
+
+```bash
+for METRO in fra ewr sin; do
+  unikraft instance create \
+    --set metro=$METRO \
+    --set name=web-$METRO \
+    --set image=myapp:latest \
+    --set service.services=443:8080/tls+http \
+    --set service.domains=name=app
+done
+```
+
+Then configure GeoDNS to route users to the nearest metro.
+
+### Metro Selection by Latency
+
+Find the lowest-latency metro:
+
+```bash
+# List metros with ping times
+unikraft metro list -f +status.ping -o table
+
+# Use the metro with lowest ping
+BEST_METRO=$(unikraft metro list -f +status.ping -o json | \
+  jq -r 'sort_by(.status.ping) | .[0].name')
+
+unikraft instance create --set metro=$BEST_METRO ...
+```
+
+### Data Residency Compliance
+
+Ensure data stays in specific regions:
+
+```bash
+# GDPR compliance - EU data in EU metros
+if [ "$USER_COUNTRY" = "EU" ]; then
+  METRO=fra
+else
+  METRO=ewr
+fi
+
+unikraft instance create --set metro=$METRO --set name=app --set image=myapp:latest
+```
+
+## Metro Registries
+
+Each metro has its own image registry:
+
+```bash
+# Frankfurt registry
+fra.index.unikraft.io/official/nginx:latest
+
+# Newark registry
+ewr.index.unikraft.io/official/nginx:latest
+```
+
+Images are automatically pulled from the nearest registry.
+
+<Info>
+  Images are mirrored across metros automatically. You don't need to manually copy images between metros.
+</Info>
+
+## Cross-Metro Communication
+
+Resources in different metros are isolated. Options for cross-metro connectivity:
+
+### 1. Public Endpoints
+
+Use service group domains:
+
+```bash
+# Instance in fra
+unikraft service create --set metro=fra --set name=api --set domains=name=api-fra
+
+# Instance in ewr connects via public domain
+curl https://api-fra.fra.unikraft.cloud
+```
+
+### 2. Database Replication
+
+Replicate data between metros:
+
+```bash
+# Primary in fra
+unikraft instance create --set metro=fra --set name=db-primary --set image=postgres:15
+
+# Replica in ewr
+unikraft instance create --set metro=ewr --set name=db-replica --set image=postgres:15
+
+# Configure replication using public endpoints
+```
+
+### 3. Message Queues
+
+Use pub/sub for async communication:
+
+```bash
+# Producer in fra
+unikraft instance create --set metro=fra --set name=producer --set image=publisher:latest
+
+# Consumer in ewr
+unikraft instance create --set metro=ewr --set name=consumer --set image=subscriber:latest
+
+# Both connect to global message queue service
+```
+
+## Metro Health Monitoring
+
+Monitor metro availability:
+
+```bash
+# Check all metros
+unikraft metro list -f +status.online
+
+# Alert on offline metros
+OFFLINE=$(unikraft metro list -f +status.online -o json | \
+  jq -r '.[] | select(.status.online=="offline") | .name')
+
+if [ -n "$OFFLINE" ]; then
+  echo "Warning: Metro $OFFLINE is offline"
+fi
+```
+
+## Relationship to Other Resources
+
+<CardGroup cols={3}>
+  <Card title="Instances" icon="microchip" href="/core-concepts/instances">
+    Instances run in specific metros
+  </Card>
+  <Card title="Volumes" icon="hard-drive" href="/core-concepts/volumes">
+    Volumes are created in metros
+  </Card>
+  <Card title="Services" icon="network-wired" href="/core-concepts/services">
+    Service groups are metro-scoped
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Certificates" icon="lock" href="/core-concepts/certificates">
+    Certificates are stored per metro
+  </Card>
+  <Card title="Images" icon="box" href="/core-concepts/images">
+    Each metro has a local registry cache
+  </Card>
+</CardGroup>
+
+<Tip>
+  Use the `-f +status` flag to see real-time connectivity information when choosing metros for deployment.
+</Tip>
+
+<Note>
+  Metro names are short codes (3 letters) based on IATA airport codes for the nearest major city.
+</Note>
+
+## Best Practices
+
+- **Deploy close to users**: Minimize latency by choosing nearby metros
+- **Use multiple metros**: Improve availability and disaster recovery
+- **Monitor connectivity**: Check metro status before deployments
+- **Consider data residency**: Ensure compliance with local regulations
+- **Test cross-metro**: Verify multi-region setups work as expected

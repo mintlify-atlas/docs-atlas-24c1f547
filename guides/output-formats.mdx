@@ -1,0 +1,643 @@
+---
+title: Output Formats
+description: Customize CLI output with JSON, tables, and field selection for scripting and automation
+---
+
+The Unikraft CLI supports multiple output formats to suit different use cases, from human-friendly tables to machine-readable JSON. This guide covers all output formatting options and their practical applications.
+
+## Output Format Types
+
+The CLI provides three primary output formats:
+
+1. **Table** (default): Human-readable tabular output
+2. **JSON**: Machine-readable structured data
+3. **Key-Value**: Detailed single-resource view
+
+## Table Output
+
+The default format for list commands displays resources in a table:
+
+```bash
+unikraft instances list
+```
+
+Example output:
+
+```
+METRO  NAME          UUID                                  STATE    IMAGE           MEMORY  CREATED
+fra    web-1         550e8400-e29b-41d4-a716-446655440000  running  nginx:latest    512MiB  2 hours ago
+fra    api-service   6ba7b810-9dad-11d1-80b4-00c04fd430c8  running  api:v1.2.3      1GiB    5 hours ago
+sfo    worker        6ba7b811-9dad-11d1-80b4-00c04fd430c9  stopped  worker:latest   256MiB  1 day ago
+```
+
+### Table Features
+
+- **Automatic column sizing**: Adjusts to terminal width
+- **Sortable**: Results typically sorted by creation time
+- **Color coding**: States may be color-coded (if terminal supports it)
+- **Truncation**: Long values truncated to fit columns
+
+## JSON Output
+
+For scripting, automation, or integration with other tools, use JSON format:
+
+```bash
+unikraft instances list -o json
+```
+
+Example output:
+
+```json
+[
+  {
+    "metro": "fra",
+    "name": "web-1",
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "state": "running",
+    "image": "nginx:latest",
+    "resources": {
+      "memory": 536870912,
+      "vcpus": 1
+    },
+    "timestamps": {
+      "created": "2026-03-09T10:30:00Z"
+    }
+  },
+  {
+    "metro": "fra",
+    "name": "api-service",
+    "uuid": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "state": "running",
+    "image": "api:v1.2.3",
+    "resources": {
+      "memory": 1073741824,
+      "vcpus": 2
+    },
+    "timestamps": {
+      "created": "2026-03-09T07:15:00Z"
+    }
+  }
+]
+```
+
+### JSON Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Scripting" icon="code">
+    Parse output in shell scripts:
+    ```bash
+    instances=$(unikraft instances list -o json)
+    echo $instances | jq '.[].name'
+    ```
+  </Card>
+
+  <Card title="CI/CD Integration" icon="gears">
+    Integrate with deployment pipelines:
+    ```bash
+    unikraft instances list -o json | \
+      jq '.[] | select(.state == "running")'
+    ```
+  </Card>
+
+  <Card title="Monitoring" icon="chart-line">
+    Export data to monitoring systems:
+    ```bash
+    unikraft instances list -o json | \
+      jq '[.[] | {name, state, memory: .resources.memory}]'
+    ```
+  </Card>
+
+  <Card title="Data Processing" icon="table">
+    Process with other tools:
+    ```bash
+    unikraft volumes list -o json | \
+      jq 'group_by(.metro) | map({metro: .[0].metro, count: length})'
+    ```
+  </Card>
+</CardGroup>
+
+## Key-Value Output
+
+For single resource inspection, the CLI uses key-value format:
+
+```bash
+unikraft instances get web-1
+```
+
+Example output:
+
+```
+METRO     fra
+NAME      web-1
+UUID      550e8400-e29b-41d4-a716-446655440000
+STATE     running
+IMAGE     nginx:latest
+
+RUNTIME:
+  ARGS    ["nginx", "-g", "daemon off;"]
+  ENV     DATABASE_URL=postgres://db.internal/app
+          REDIS_URL=redis://cache.internal:6379
+
+RESOURCES:
+  MEMORY  512MiB
+  VCPUS   1
+
+VOLUMES:
+  NAME    uploads
+  UUID    7ba7b811-9dad-11d1-80b4-00c04fd430d1
+  AT      /uploads
+
+SERVICE:
+  NAME     web-service
+  UUID     8ba7b811-9dad-11d1-80b4-00c04fd430d2
+  DOMAINS  www.example.com (cert: auto-www-example)
+
+TIMESTAMPS:
+  CREATED  2 hours ago
+  STARTED  2 hours ago
+
+SCALE-TO-ZERO:
+  ENABLED       true
+  POLICY        on
+  COOLDOWN TIME 300000ms (5m)
+```
+
+### Key-Value with JSON
+
+Combine detailed view with JSON:
+
+```bash
+unikraft instances get web-1 -o json
+```
+
+Returns full resource data in JSON format.
+
+## Field Selection
+
+Choose specific fields to display:
+
+```bash
+unikraft instances list --fields name,state,image
+```
+
+Example output:
+
+```
+NAME          STATE    IMAGE
+web-1         running  nginx:latest
+api-service   running  api:v1.2.3
+worker        stopped  worker:latest
+```
+
+### Common Field Selections
+
+<CodeGroup>
+```bash Basic Info
+unikraft instances list --fields name,state,metro
+```
+
+```bash Resources
+unikraft instances list --fields name,resources.memory,resources.vcpus
+```
+
+```bash Networking
+unikraft instances list --fields name,service.name,service.domains
+```
+
+```bash Timestamps
+unikraft instances list --fields name,timestamps.created,timestamps.started
+```
+</CodeGroup>
+
+### Nested Fields
+
+Access nested data with dot notation:
+
+```bash
+unikraft instances get web-1 --fields name,runtime.env,resources.memory
+```
+
+Example output:
+
+```
+NAME      web-1
+
+RUNTIME:
+  ENV     DATABASE_URL=postgres://db.internal/app
+          REDIS_URL=redis://cache.internal:6379
+
+RESOURCES:
+  MEMORY  512MiB
+```
+
+## Verbose Output
+
+Show additional fields with verbose mode:
+
+```bash
+unikraft instances get web-1 -v
+```
+
+Verbose mode includes:
+- Full UUID values
+- Additional metadata
+- Detailed nested structures
+- Internal identifiers
+
+### Verbose with Field Selection
+
+Combine verbose mode with field selection:
+
+```bash
+unikraft instances get web-1 -v --fields name,uuid,networks
+```
+
+## Output Formatting Examples
+
+### Instances
+
+<CodeGroup>
+```bash List All
+unikraft instances list
+```
+
+```bash JSON
+unikraft instances list -o json
+```
+
+```bash Specific Fields
+unikraft instances list --fields name,state,image,resources.memory
+```
+
+```bash Single Instance
+unikraft instances get web-1
+```
+
+```bash Single Instance JSON
+unikraft instances get web-1 -o json
+```
+</CodeGroup>
+
+### Volumes
+
+<CodeGroup>
+```bash List Volumes
+unikraft volumes list
+```
+
+```bash With Size Info
+unikraft volumes list --fields name,size,state,attached
+```
+
+```bash JSON for Scripting
+unikraft volumes list -o json | jq '.[] | select(.state == "ready")'
+```
+</CodeGroup>
+
+### Service Groups
+
+<CodeGroup>
+```bash List Services
+unikraft services list
+```
+
+```bash With Details
+unikraft services list --fields name,services,domains,instances
+```
+
+```bash Single Service
+unikraft services get web-service
+```
+</CodeGroup>
+
+### Certificates
+
+<CodeGroup>
+```bash List Certificates
+unikraft certificates list
+```
+
+```bash Expiration Tracking
+unikraft certificates list --fields name,common-name,not-after
+```
+
+```bash JSON for Monitoring
+unikraft certificates list -o json | \
+  jq '.[] | {name, cn: .common_name, expires: .not_after}'
+```
+</CodeGroup>
+
+## Scripting with Output Formats
+
+### Shell Script Integration
+
+```bash
+#!/bin/bash
+# Get running instances
+instances=$(unikraft instances list -o json | \
+  jq -r '.[] | select(.state == "running") | .name')
+
+for instance in $instances; do
+  echo "Processing $instance"
+  unikraft instances get $instance --fields name,state,resources.memory
+done
+```
+
+### JSON Processing with jq
+
+<CodeGroup>
+```bash Filter by State
+unikraft instances list -o json | \
+  jq '.[] | select(.state == "running")'
+```
+
+```bash Extract Names
+unikraft instances list -o json | \
+  jq -r '.[].name'
+```
+
+```bash Count by Metro
+unikraft instances list -o json | \
+  jq 'group_by(.metro) | map({metro: .[0].metro, count: length})'
+```
+
+```bash Sum Memory Usage
+unikraft instances list -o json | \
+  jq '[.[] | .resources.memory] | add'
+```
+
+```bash Filter and Format
+unikraft instances list -o json | \
+  jq '.[] | {name, image, memory: "\(.resources.memory / 1048576)MiB"}'
+```
+</CodeGroup>
+
+### Python Integration
+
+```python
+import json
+import subprocess
+
+# Get instances as JSON
+result = subprocess.run(
+    ['unikraft', 'instances', 'list', '-o', 'json'],
+    capture_output=True,
+    text=True
+)
+
+instances = json.loads(result.stdout)
+
+# Process instances
+for instance in instances:
+    if instance['state'] == 'running':
+        print(f"{instance['name']}: {instance['resources']['memory']} bytes")
+```
+
+### Monitoring Scripts
+
+```bash
+#!/bin/bash
+# Check for stopped instances and alert
+
+stopped=$(unikraft instances list -o json | \
+  jq -r '.[] | select(.state == "stopped") | .name')
+
+if [ -n "$stopped" ]; then
+  echo "Alert: Stopped instances detected:"
+  echo "$stopped"
+  # Send notification
+fi
+```
+
+## CSV Export
+
+Convert JSON output to CSV:
+
+```bash
+# Using jq
+unikraft instances list -o json | \
+  jq -r '(.[0] | keys_unsorted) as $keys | $keys, 
+    (.[] | [.[$keys[]]] | @csv)' > instances.csv
+
+# Simplified for specific fields
+unikraft instances list -o json | \
+  jq -r '.["name", "state", "image"] | @csv' > instances.csv
+```
+
+## Combining Outputs
+
+### Multi-Resource Reports
+
+```bash
+#!/bin/bash
+# Generate comprehensive report
+
+echo "=== Instances ==="
+unikraft instances list --fields name,state,metro,resources.memory
+
+echo ""
+echo "=== Volumes ==="
+unikraft volumes list --fields name,size,state
+
+echo ""
+echo "=== Services ==="
+unikraft services list --fields name,domains,instances
+```
+
+### Cross-Resource Analysis
+
+```bash
+# Find all instances using a specific service
+service_instances=$(unikraft services get web-service -o json | \
+  jq -r '.instances[].name')
+
+for instance in $service_instances; do
+  unikraft instances get $instance --fields name,state,resources
+done
+```
+
+## Common Output Patterns
+
+### Listing Resources
+
+<CodeGroup>
+```bash Default Table
+unikraft instances list
+```
+
+```bash Custom Columns
+unikraft instances list --fields name,state,image
+```
+
+```bash JSON for Processing
+unikraft instances list -o json | jq '.[] | {name, state}'
+```
+</CodeGroup>
+
+### Inspecting Resources
+
+<CodeGroup>
+```bash Full Details
+unikraft instances get my-instance
+```
+
+```bash Specific Fields
+unikraft instances get my-instance --fields name,state,resources
+```
+
+```bash JSON Export
+unikraft instances get my-instance -o json
+```
+</CodeGroup>
+
+### Filtering and Searching
+
+```bash
+# Find instances by name pattern
+unikraft instances list -o json | \
+  jq '.[] | select(.name | contains("prod"))'
+
+# Find volumes over certain size
+unikraft volumes list -o json | \
+  jq '.[] | select(.size_mb > 10240)'
+
+# Find certificates expiring soon
+unikraft certificates list -o json | \
+  jq '.[] | select(.not_after < "2026-04-01")'
+```
+
+## Environment-Specific Formatting
+
+### CI/CD Pipelines
+
+```yaml
+# GitHub Actions example
+- name: Check instance status
+  run: |
+    STATUS=$(unikraft instances get prod-api -o json | jq -r '.state')
+    if [ "$STATUS" != "running" ]; then
+      echo "Error: Instance not running"
+      exit 1
+    fi
+```
+
+### Local Development
+
+```bash
+# Human-friendly output
+export UNIKRAFT_OUTPUT=table
+unikraft instances list
+
+# Machine-readable for scripts
+export UNIKRAFT_OUTPUT=json
+instances=$(unikraft instances list)
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use JSON for Scripting" icon="code">
+    Always use `-o json` in scripts for reliable parsing:
+    ```bash
+    unikraft instances list -o json | jq '...'
+    ```
+  </Card>
+
+  <Card title="Select Needed Fields" icon="filter">
+    Use `--fields` to reduce output size and improve clarity:
+    ```bash
+    unikraft instances list --fields name,state
+    ```
+  </Card>
+
+  <Card title="Validate JSON Output" icon="check">
+    Always validate JSON parsing:
+    ```bash
+    data=$(unikraft instances list -o json)
+    if ! echo "$data" | jq empty; then
+      echo "Invalid JSON"
+      exit 1
+    fi
+    ```
+  </Card>
+
+  <Card title="Use jq for Processing" icon="gear">
+    Leverage jq for complex JSON manipulation:
+    ```bash
+    unikraft instances list -o json | \
+      jq '[.[] | select(.state == "running")] | length'
+    ```
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Output Not Displaying
+
+If output appears truncated or missing:
+
+1. **Check terminal width**:
+   ```bash
+   echo $COLUMNS
+   ```
+
+2. **Use JSON for full data**:
+   ```bash
+   unikraft instances list -o json
+   ```
+
+3. **Select specific fields**:
+   ```bash
+   unikraft instances list --fields name,state
+   ```
+
+### JSON Parsing Errors
+
+If JSON output is invalid:
+
+1. **Verify command succeeded**:
+   ```bash
+   unikraft instances list -o json
+   echo $?  # Should be 0
+   ```
+
+2. **Check for errors in output**:
+   ```bash
+   unikraft instances list -o json 2>&1 | grep -i error
+   ```
+
+3. **Test JSON validity**:
+   ```bash
+   unikraft instances list -o json | jq empty
+   ```
+
+### Field Not Found
+
+If a field doesn't appear:
+
+1. **Check field name**:
+   ```bash
+   unikraft instances get my-instance -o json | jq 'keys'
+   ```
+
+2. **Use verbose mode**:
+   ```bash
+   unikraft instances get my-instance -v --fields name,uuid
+   ```
+
+3. **Try nested path**:
+   ```bash
+   unikraft instances get my-instance --fields resources.memory
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Start deploying instances with the CLI
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Set up authentication for the CLI
+  </Card>
+</CardGroup>

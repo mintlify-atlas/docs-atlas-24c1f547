@@ -1,0 +1,339 @@
+---
+title: Services
+description: Load-balanced service groups for exposing instances
+---
+
+Service groups provide load balancing, TLS termination, and domain-based routing for instances. They enable public access to your applications through managed DNS and automatic traffic distribution.
+
+## What is a Service Group?
+
+A service group is a logical grouping of instances that share network configuration, including:
+- Port mappings and protocol handlers
+- DNS domain names
+- TLS certificates
+- Autoscaling and connection limits
+
+Traffic sent to a service group's domains is automatically load-balanced across all attached instances.
+
+## Key Properties
+
+### Identification
+
+- **Name** (`string`) - Human-readable service group name (services.go:40)
+- **UUID** (`string`) - Unique identifier (services.go:41)
+- **Metro** (`string`) - Geographic location (services.go:39)
+
+### Configuration
+
+- **Persistent** (`bool`) - Whether the service group persists when empty (services.go:43)
+- **Autoscale** (`bool`) - Whether instances autoscale based on load (services.go:44)
+
+### Connection Limits
+
+Control scaling behavior with soft and hard limits (services.go:46-49):
+
+- **Limits.Soft** (`uint64`) - Target connections per instance before scaling up
+- **Limits.Hard** (`uint64`) - Maximum connections per instance (reject beyond this)
+
+### Domains
+
+DNS domains that route to this service group (services.go:55):
+
+- **FQDN** (`string`) - Fully qualified domain name
+- **Certificate.Name/UUID** (`string`) - Associated TLS certificate for HTTPS
+
+### Services (Port Mappings)
+
+Define how traffic is routed to instances (services.go:62):
+
+- **Source** (`uint32`) - External port clients connect to
+- **Destination** (`uint32`) - Internal port on instances
+- **Handlers** (`[]string`) - Protocol handlers (e.g., `tls`, `http`, `http+redirect`)
+
+### Instances
+
+List of instances in this service group (services.go:57-60):
+
+- **Name** (`string`) - Instance name
+- **UUID** (`string`) - Instance UUID
+
+### Timestamps
+
+- **Created** (`types.RelativeTime`) - When the service group was created (services.go:52)
+
+## Service Format Specification
+
+When defining services (port mappings), use this format:
+
+```
+<SOURCE_PORT>:<DEST_PORT>/<HANDLER>[+<HANDLER>...]
+```
+
+**Components:**
+- `SOURCE_PORT` - External port (e.g., `443`, `80`, `8080`)
+- `DEST_PORT` - Instance port (e.g., `8080`, `3000`)
+- `HANDLER` - Protocol handlers, combined with `+`
+
+**Common Handlers:**
+- `tls` - TLS termination
+- `http` - HTTP protocol
+- `http+redirect` - HTTP to HTTPS redirect
+- `tcp` - Raw TCP passthrough
+
+**Examples:**
+```bash
+# HTTPS with TLS termination
+443:8080/tls+http
+
+# HTTP to HTTPS redirect
+80:8080/http+redirect
+
+# Plain HTTP
+8080:8080/http
+
+# TCP passthrough
+5432:5432/tcp
+```
+
+See services.go:74-113 for the implementation.
+
+## Service Group Lifecycle
+
+### Creating a Service Group
+
+```bash
+unikraft service create \
+  --set name=demo-service \
+  --set metro=fra \
+  --set domains=name=demo \
+  --set services=443:8080/tls+http
+```
+
+This creates a service group that:
+- Routes HTTPS traffic from port 443 to instance port 8080
+- Uses the domain `demo.fra.unikraft.cloud`
+- Terminates TLS before forwarding HTTP
+
+### Adding Instances to a Service Group
+
+Instances join service groups during creation:
+
+```bash
+unikraft instance create \
+  --set name=web-1 \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set service.name=demo-service
+```
+
+Or create instances with a new service group:
+
+```bash
+unikraft instance create \
+  --set name=web-1 \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set service.services=443:8080/tls+http \
+  --set service.domains=name=myapp
+```
+
+### Editing Service Configuration
+
+```bash
+# Update connection limits
+unikraft service edit demo-service \
+  --set limits.soft=100 \
+  --set limits.hard=200
+
+# Add a new port mapping
+unikraft service edit demo-service \
+  --add services=8443:8080/tls
+
+# Add a custom domain
+unikraft service edit demo-service \
+  --add domains=name=myapp.example.com.
+```
+
+<Note>
+  Domain names must end with a `.` to indicate they are fully qualified.
+</Note>
+
+### Deleting a Service Group
+
+```bash
+unikraft service delete demo-service
+```
+
+<Warning>
+  Deleting a service group removes domain routing. Ensure instances are stopped or have alternative access before deletion.
+</Warning>
+
+## Common Use Cases
+
+### Public Web Application
+
+Expose a web application with HTTPS:
+
+```bash
+unikraft service create \
+  --set name=webapp \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set services=80:8080/http+redirect \
+  --set domains=name=myapp \
+  --set limits.soft=50 \
+  --set limits.hard=100
+
+unikraft instance create \
+  --set name=web-1 \
+  --set metro=fra \
+  --set image=myapp:latest \
+  --set service.name=webapp \
+  --set replicas=3
+```
+
+This configuration:
+- Serves HTTPS on port 443 with TLS termination
+- Redirects HTTP (port 80) to HTTPS
+- Scales up at 50 connections per instance
+- Rejects connections beyond 100 per instance
+- Creates 3 load-balanced instances
+
+### API Service with Multiple Endpoints
+
+Run an API with multiple port mappings:
+
+```bash
+unikraft service create \
+  --set name=api-service \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set services=8443:9090/tls+http \
+  --set domains=name=api
+```
+
+### Custom Domain with Certificate
+
+Use a custom domain with your own certificate:
+
+```bash
+# First, create a certificate
+unikraft certificate create \
+  --set name=myapp-cert \
+  --set cn=myapp.example.com. \
+  --set-file chain=cert.pem \
+  --set-file pkey=cert.key \
+  --set metro=fra
+
+# Create service with custom domain
+unikraft service create \
+  --set name=myapp \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set domains=name=myapp.example.com.
+```
+
+The certificate is automatically associated with the matching domain.
+
+### TCP Service (Non-HTTP)
+
+For protocols other than HTTP:
+
+```bash
+unikraft service create \
+  --set name=postgres \
+  --set metro=fra \
+  --set services=5432:5432/tcp \
+  --set domains=name=db
+```
+
+### Autoscaling Service
+
+Configure autoscaling based on connection load:
+
+```bash
+unikraft service create \
+  --set name=autoscale-service \
+  --set metro=fra \
+  --set services=443:8080/tls+http \
+  --set domains=name=autoscale \
+  --set limits.soft=100 \
+  --set limits.hard=150
+
+# Create instances with autoscale
+unikraft instance create \
+  --set name=worker \
+  --set metro=fra \
+  --set image=worker:latest \
+  --set service.name=autoscale-service \
+  --set service.soft-limit=100 \
+  --set service.hard-limit=150
+```
+
+## Load Balancing Behavior
+
+Service groups automatically distribute traffic across instances:
+
+1. **Round-robin distribution**: Requests are evenly distributed
+2. **Health checking**: Unhealthy instances are removed from rotation
+3. **Session affinity**: Not currently supported (stateless load balancing)
+
+<Info>
+  All instances in a service group receive equal traffic distribution. Use multiple service groups for weighted routing.
+</Info>
+
+## Domain Management
+
+### Auto-Generated Domains
+
+When you specify a domain with just a name, Unikraft generates the FQDN:
+
+```bash
+--set domains=name=myapp
+# Generates: myapp.fra.unikraft.cloud
+```
+
+### Custom Domains
+
+For custom domains, include the full FQDN with trailing dot:
+
+```bash
+--set domains=name=myapp.example.com.
+```
+
+Then configure your DNS:
+```
+myapp.example.com. CNAME myapp.fra.unikraft.cloud.
+```
+
+### Multiple Domains
+
+A service group can have multiple domains:
+
+```bash
+unikraft service edit myapp \
+  --add domains=name=myapp.example.com. \
+  --add domains=name=app.example.com.
+```
+
+## Relationship to Other Resources
+
+<CardGroup cols={3}>
+  <Card title="Instances" icon="microchip" href="/core-concepts/instances">
+    Instances join service groups for load balancing
+  </Card>
+  <Card title="Certificates" icon="lock" href="/core-concepts/certificates">
+    Certificates enable TLS for service domains
+  </Card>
+  <Card title="Metros" icon="globe" href="/core-concepts/metros">
+    Service groups are metro-specific
+  </Card>
+</CardGroup>
+
+<Tip>
+  Use soft and hard limits to control scaling behavior. Set soft limit to trigger scaling and hard limit to protect instances from overload.
+</Tip>
+
+<Note>
+  Service groups in different metros require separate configurations. Use the same name in multiple metros for multi-region deployments.
+</Note>

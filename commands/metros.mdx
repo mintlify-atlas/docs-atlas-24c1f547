@@ -1,0 +1,151 @@
+---
+title: 'metros'
+description: 'List and inspect Unikraft Cloud metros'
+---
+
+Manage and inspect Unikraft Cloud metros. Metros are geographic locations where you can deploy resources.
+
+## Usage
+
+```bash
+unikraft metro [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List metros">
+  List all available metros configured in your profile.
+
+  ```bash
+  unikraft metro list [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # List all metros
+  unikraft metro list
+  ```
+
+  ```bash
+  # List metros with connection status
+  unikraft metro list -f +status
+  ```
+
+  ```bash
+  $ unikraft metro list
+  NAME  COUNTRY  ENDPOINT
+  fra   Germany  https://api.fra.unikraft.cloud
+  lhr   UK       https://api.lhr.unikraft.cloud
+  ewr   USA      https://api.ewr.unikraft.cloud
+  ```
+
+  ```bash
+  $ unikraft metro list -f +status
+  NAME  COUNTRY  ENDPOINT                          STATUS.ONLINE  STATUS.PING
+  fra   Germany  https://api.fra.unikraft.cloud    online         15ms
+  lhr   UK       https://api.lhr.unikraft.cloud    online         45ms
+  ewr   USA      https://api.ewr.unikraft.cloud    online         120ms
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect a metro">
+  Get detailed information about a specific metro by name.
+
+  ```bash
+  unikraft metro get <name> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Inspect a metro by name
+  unikraft metro get fra
+  ```
+
+  ```bash
+  $ unikraft metro get fra
+  NAME      fra
+  COUNTRY   Germany
+  ENDPOINT  https://api.fra.unikraft.cloud
+  INSECURE  false
+  ```
+</Accordion>
+
+## Metro Configuration
+
+Metros are configured in your Unikraft Cloud profile. The configuration includes:
+
+- **Name** - Short identifier for the metro (e.g., `fra`, `lhr`, `ewr`)
+- **Country** - Geographic location
+- **Endpoint** - API endpoint URL
+- **Insecure** - Whether to skip TLS verification (for development only)
+
+## Connection Status
+
+When listing metros with the `+status` field, the CLI performs real-time checks:
+
+- **IP** - Resolved IP address(es) of the metro endpoint
+- **Ping** - Network latency to the metro (TCP connection time)
+- **Online** - Whether the metro API is responding
+
+<Info>
+Status checks are performed in parallel and have a 5-second timeout. If a metro is unreachable, status fields will be empty.
+</Info>
+
+## Common Metro Codes
+
+Unikraft Cloud uses IATA airport codes for metro identifiers:
+
+| Code | Location | Region |
+|------|----------|--------|
+| `fra` | Frankfurt | Europe |
+| `lhr` | London | Europe |
+| `ewr` | Newark | North America |
+
+## Using Metros
+
+When creating resources, specify the metro with the `--set metro=<code>` flag:
+
+```bash
+# Create instance in Frankfurt
+unikraft instance create \
+  --set metro=fra \
+  --set image=nginx:latest \
+  --set resources.memory=128
+
+# Create volume in London
+unikraft volume create \
+  --set metro=lhr \
+  --set size=10
+```
+
+## Multi-Metro Operations
+
+Many commands work across all metros automatically:
+
+```bash
+# List instances in all metros
+unikraft instance list
+
+# Get instance from any metro (auto-detected)
+unikraft instance get my-instance
+```
+
+## Metro-Specific Images
+
+Each metro has its own image registry at `<metro>.index.unikraft.io`:
+
+```bash
+# Pull image to specific metro
+fra.index.unikraft.io/official/nginx:latest
+
+# Pull from default registry (available in all metros)
+index.unikraft.io/official/nginx:latest
+```
+
+## See Also
+
+- [instances](/commands/instances) - Create instances in metros
+- [volumes](/commands/volumes) - Create volumes in metros
+- [services](/commands/services) - Create service groups in metros

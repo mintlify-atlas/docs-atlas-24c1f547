@@ -1,0 +1,425 @@
+---
+title: Environment Variables
+description: Configure the Unikraft CLI behavior using environment variables
+---
+
+The Unikraft CLI supports several environment variables that allow you to customize its behavior without modifying the configuration file. These variables take precedence over configuration file settings.
+
+## Available Environment Variables
+
+### UNIKRAFT_CONFIG
+
+Override the default configuration file path.
+
+**Default:** Platform-specific (see [Configuration File](/configuration/config-file))
+
+**Example:**
+```bash
+export UNIKRAFT_CONFIG=/custom/path/to/config.yaml
+unikraft instances list
+```
+
+**Use Cases:**
+- Testing different configurations
+- Using project-specific configuration files
+- CI/CD pipelines with custom configurations
+- Multi-tenant setups with separate config files
+
+<Tip>
+You can use relative paths, but absolute paths are recommended to avoid ambiguity:
+
+```bash
+export UNIKRAFT_CONFIG=./configs/staging.yaml
+```
+</Tip>
+
+### UNIKRAFT_PROFILE
+
+Override the active profile without modifying the configuration file.
+
+**Default:** Value of `profile` field in config file, or `default`
+
+**Example:**
+```bash
+export UNIKRAFT_PROFILE=staging
+unikraft instances list
+```
+
+**Use Cases:**
+- Temporarily switch profiles for testing
+- Use different profiles in different terminal sessions
+- CI/CD pipelines deploying to different environments
+- Scripts that need to operate on specific profiles
+
+<Note>
+The `--profile` command-line flag takes precedence over this environment variable:
+
+```bash
+# This uses 'production' profile, not 'staging'
+export UNIKRAFT_PROFILE=staging
+unikraft --profile=production instances list
+```
+</Note>
+
+### UNIKRAFT_LOG_LEVEL
+
+Set the verbosity level of log output.
+
+**Default:** `info`
+
+**Valid Values:** `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+
+**Example:**
+```bash
+export UNIKRAFT_LOG_LEVEL=debug
+unikraft instances create my-instance
+```
+
+**Log Level Descriptions:**
+
+| Level | Description | Use Case |
+|-------|-------------|----------|
+| `trace` | Most verbose, includes all debug info | Deep troubleshooting, development |
+| `debug` | Detailed operational information | Debugging issues, understanding CLI behavior |
+| `info` | Standard informational messages | Normal operation (default) |
+| `warn` | Warning messages for potential issues | Production monitoring |
+| `error` | Error messages only | Production, quiet operation |
+| `fatal` | Only fatal errors that cause termination | Minimal output |
+
+<Tip>
+Use `debug` or `trace` levels when reporting issues to get more detailed information:
+
+```bash
+UNIKRAFT_LOG_LEVEL=debug unikraft instances create my-instance > debug.log 2>&1
+```
+</Tip>
+
+### UNIKRAFT_LOG_TYPE
+
+Set the output format for log messages.
+
+**Default:** `text`
+
+**Valid Values:** `text`, `json`
+
+**Example:**
+```bash
+export UNIKRAFT_LOG_TYPE=json
+unikraft instances list
+```
+
+**Text Format:**
+```
+INFO  Creating instance name=my-instance metro=fra
+INFO  Instance created successfully id=abc123
+```
+
+**JSON Format:**
+```json
+{"level":"info","time":"2026-03-09T10:30:00Z","message":"Creating instance","name":"my-instance","metro":"fra"}
+{"level":"info","time":"2026-03-09T10:30:01Z","message":"Instance created successfully","id":"abc123"}
+```
+
+<Note>
+JSON format is ideal for:
+- Log aggregation systems (Elasticsearch, Splunk, etc.)
+- Automated parsing and analysis
+- CI/CD pipeline integration
+- Structured logging requirements
+</Note>
+
+### UNIKRAFT_TELEMETRY
+
+Enable or disable anonymous usage telemetry.
+
+**Default:** `true`
+
+**Valid Values:** `true`, `false`
+
+**Example:**
+```bash
+export UNIKRAFT_TELEMETRY=false
+unikraft instances create my-instance
+```
+
+**What is Collected:**
+- Command usage patterns (which commands are run)
+- Error occurrences (anonymized)
+- CLI version and platform information
+- Performance metrics
+
+**What is NOT Collected:**
+- Personal information
+- Instance names or IDs
+- API tokens or credentials
+- Environment variables
+- File paths or content
+- Organization details
+
+<Tip>
+You can also disable telemetry using the `DO_NOT_TRACK` environment variable:
+
+```bash
+export DO_NOT_TRACK=1
+```
+
+Or use the `--no-telemetry` flag for individual commands:
+
+```bash
+unikraft --no-telemetry instances list
+```
+</Tip>
+
+## Environment Variable Precedence
+
+The Unikraft CLI follows this precedence order (highest to lowest):
+
+1. **Command-line flags** (e.g., `--profile=staging`)
+2. **Environment variables** (e.g., `UNIKRAFT_PROFILE=staging`)
+3. **Configuration file** (e.g., `profile: staging` in `config.yaml`)
+4. **Default values** (e.g., `default` profile, `info` log level)
+
+**Example:**
+
+```yaml
+# config.yaml
+profile: production
+```
+
+```bash
+export UNIKRAFT_PROFILE=staging
+
+# Uses 'staging' (environment variable overrides config)
+unikraft instances list
+
+# Uses 'development' (flag overrides both)
+unikraft --profile=development instances list
+```
+
+## Common Usage Patterns
+
+### Development Environment Setup
+
+```bash
+# ~/.bashrc or ~/.zshrc
+export UNIKRAFT_PROFILE=development
+export UNIKRAFT_LOG_LEVEL=debug
+export UNIKRAFT_TELEMETRY=false
+```
+
+### Production Environment Setup
+
+```bash
+# /etc/environment or CI/CD configuration
+export UNIKRAFT_PROFILE=production
+export UNIKRAFT_LOG_LEVEL=error
+export UNIKRAFT_LOG_TYPE=json
+```
+
+### Testing Multiple Configurations
+
+```bash
+# Terminal 1 - Production
+export UNIKRAFT_PROFILE=production
+unikraft instances list
+
+# Terminal 2 - Staging
+export UNIKRAFT_PROFILE=staging
+unikraft instances list
+```
+
+### CI/CD Pipeline Example
+
+```yaml
+# GitHub Actions example
+env:
+  UNIKRAFT_CONFIG: ${{ secrets.UNIKRAFT_CONFIG }}
+  UNIKRAFT_PROFILE: production
+  UNIKRAFT_LOG_TYPE: json
+  UNIKRAFT_TELEMETRY: false
+
+steps:
+  - name: Deploy to production
+    run: |
+      unikraft run --metro=fra -p 443:8080/http+tls nginx:latest
+```
+
+### Debugging with Verbose Logging
+
+```bash
+# Temporary debug session
+UNIKRAFT_LOG_LEVEL=trace UNIKRAFT_LOG_TYPE=text unikraft instances create test-instance
+
+# Save debug output to file
+UNIKRAFT_LOG_LEVEL=debug unikraft run my-app:latest 2>&1 | tee debug.log
+```
+
+### Per-Project Configuration
+
+```bash
+# project/.env
+UNIKRAFT_CONFIG=./unikraft-config.yaml
+UNIKRAFT_PROFILE=project-staging
+UNIKRAFT_LOG_LEVEL=info
+
+# Load and use
+source .env
+unikraft instances list
+```
+
+## Setting Environment Variables
+
+<Tabs>
+  <Tab title="Bash/Zsh">
+    **Temporary (current session only):**
+    ```bash
+    export UNIKRAFT_PROFILE=staging
+    ```
+
+    **Permanent (all sessions):**
+    ```bash
+    echo 'export UNIKRAFT_PROFILE=staging' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+    **Per-command:**
+    ```bash
+    UNIKRAFT_PROFILE=staging unikraft instances list
+    ```
+  </Tab>
+  
+  <Tab title="Fish">
+    **Temporary (current session only):**
+    ```fish
+    set -x UNIKRAFT_PROFILE staging
+    ```
+
+    **Permanent (all sessions):**
+    ```fish
+    set -Ux UNIKRAFT_PROFILE staging
+    ```
+
+    **Per-command:**
+    ```fish
+    env UNIKRAFT_PROFILE=staging unikraft instances list
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    **Temporary (current session only):**
+    ```powershell
+    $env:UNIKRAFT_PROFILE = "staging"
+    ```
+
+    **Permanent (user profile):**
+    ```powershell
+    [System.Environment]::SetEnvironmentVariable('UNIKRAFT_PROFILE', 'staging', 'User')
+    ```
+
+    **Per-command:**
+    ```powershell
+    $env:UNIKRAFT_PROFILE="staging"; unikraft instances list
+    ```
+  </Tab>
+  
+  <Tab title="Windows CMD">
+    **Temporary (current session only):**
+    ```cmd
+    set UNIKRAFT_PROFILE=staging
+    ```
+
+    **Permanent (system-wide):**
+    ```cmd
+    setx UNIKRAFT_PROFILE staging
+    ```
+
+    **Per-command:**
+    ```cmd
+    set UNIKRAFT_PROFILE=staging && unikraft instances list
+    ```
+  </Tab>
+</Tabs>
+
+## Unsetting Environment Variables
+
+<Tabs>
+  <Tab title="Bash/Zsh">
+    ```bash
+    unset UNIKRAFT_PROFILE
+    ```
+  </Tab>
+  
+  <Tab title="Fish">
+    ```fish
+    set -e UNIKRAFT_PROFILE
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    ```powershell
+    Remove-Item Env:\UNIKRAFT_PROFILE
+    ```
+  </Tab>
+  
+  <Tab title="Windows CMD">
+    ```cmd
+    set UNIKRAFT_PROFILE=
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Verify Current Values
+
+```bash
+# Check if variable is set
+echo $UNIKRAFT_PROFILE
+
+# List all UNIKRAFT_* variables
+env | grep UNIKRAFT
+```
+
+### Variables Not Taking Effect
+
+1. **Verify the variable is exported:**
+   ```bash
+   export UNIKRAFT_PROFILE=staging  # Note the 'export'
+   ```
+
+2. **Check for typos in variable names** (they are case-sensitive)
+
+3. **Ensure no command-line flags are overriding** the variable
+
+4. **Restart your terminal** after setting permanent variables
+
+### Invalid Values
+
+If you set an invalid value (e.g., `UNIKRAFT_LOG_LEVEL=invalid`), the CLI will:
+- Display a warning or error message
+- Fall back to the default value
+- Continue execution if possible
+
+<Warning>
+Always validate your environment variable values, especially in automated environments:
+
+```bash
+if [[ "$UNIKRAFT_LOG_LEVEL" =~ ^(trace|debug|info|warn|error|fatal)$ ]]; then
+    unikraft instances list
+else
+    echo "Invalid log level: $UNIKRAFT_LOG_LEVEL"
+    exit 1
+fi
+```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration File" icon="file" href="/configuration/config-file">
+    Learn about the YAML configuration file structure
+  </Card>
+  <Card title="Shell Completion" icon="terminal" href="/configuration/shell-completion">
+    Set up tab completion for faster command entry
+  </Card>
+</CardGroup>

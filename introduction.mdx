@@ -1,0 +1,82 @@
+---
+title: Introduction
+description: Deploy and manage unikernels globally with the Unikraft CLI
+---
+
+# Unikraft CLI
+
+The official command-line interface for [Unikraft Cloud](https://unikraft.cloud) — deploy and manage unikernels globally in milliseconds.
+
+<Note>
+This is the new Unikraft CLI which will eventually supersede `kraft cloud`. It is still in early development and subject to change before the v1.0.0 release. [Feedback appreciated](https://unikraft.link/devsurvey)!
+</Note>
+
+## What is Unikraft?
+
+Unikraft is a fast, secure and open-source unikernel development kit. Unikernels are specialized, single-address-space machine images that boot in milliseconds and have minimal attack surface. The Unikraft CLI lets you deploy these unikernels as serverless instances on Unikraft Cloud's global infrastructure.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Deploy Instantly" icon="rocket">
+    Run unikernel images as serverless instances with `unikraft run`
+  </Card>
+  <Card title="Global Infrastructure" icon="globe">
+    Deploy across multiple metros with automatic multi-region support
+  </Card>
+  <Card title="Resource Management" icon="server">
+    Full CRUD operations for instances, volumes, services, certificates, and images
+  </Card>
+  <Card title="Scale-to-Zero" icon="chart-line">
+    Built-in support for scale-to-zero policies to optimize costs
+  </Card>
+  <Card title="Multiple Output Formats" icon="terminal">
+    Machine-readable JSON or human-friendly text output
+  </Card>
+  <Card title="Profile Management" icon="users">
+    Switch between multiple accounts and configurations
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Deploy an NGINX instance in Frankfurt with HTTPS enabled:
+
+```bash
+unikraft run --metro=fra -p 443:8080/http+tls nginx:latest
+```
+
+This single command:
+- Deploys a unikernel instance in the Frankfurt metro
+- Exposes port 8080 as HTTPS on port 443
+- Automatically provisions TLS certificates
+- Returns the instance URL in milliseconds
+
+## Why Unikraft CLI?
+
+**Fast Boot Times** — Unikernels boot in milliseconds, not seconds. Perfect for serverless workloads.
+
+**Global Reach** — Deploy across multiple geographic regions with a single command.
+
+**Cost Efficient** — Scale-to-zero support means you only pay for what you use.
+
+**Developer Friendly** — Familiar CLI patterns, multiple output formats, and shell completions.
+
+**Production Ready** — Full resource lifecycle management with comprehensive monitoring and logging.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the CLI on your system
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Deploy your first instance in minutes
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/core-concepts/instances">
+    Learn about instances, volumes, and services
+  </Card>
+  <Card title="Command Reference" icon="code" href="/commands/run">
+    Explore all available commands
+  </Card>
+</CardGroup>

@@ -1,0 +1,217 @@
+---
+title: 'volumes'
+description: 'Manage Unikraft Cloud volumes'
+---
+
+Manage persistent volumes in Unikraft Cloud. Volumes provide persistent storage that can be attached to instances.
+
+## Usage
+
+```bash
+unikraft volume [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List volumes">
+  List all volumes across metros.
+
+  ```bash
+  unikraft volume list [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # List all volumes
+  unikraft volume list
+  ```
+
+  ```bash
+  $ unikraft volume list
+  NAME          STATE      SIZE   CREATED       METRO
+  demo-volume   ready      10Mi   2 hours ago   fra
+  data-vol      attached   50Mi   1 day ago     lhr
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect a volume">
+  Get detailed information about one or more volumes by name or UUID.
+
+  ```bash
+  unikraft volume get <name|uuid> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Inspect a volume by name or UUID
+  unikraft volume get demo-volume
+  ```
+
+  ```bash
+  $ unikraft volume get demo-volume
+  NAME        demo-volume
+  UUID        660e9500-f39c-52e5-b827-557766551111
+  STATE       ready
+  SIZE        10Mi
+  METRO       fra
+  CREATED     2 hours ago
+  PERSISTENT  true
+  ```
+</Accordion>
+
+<Accordion title="create - Create a new volume">
+  Create a new volume.
+
+  ```bash
+  unikraft volume create [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set name=<string>" type="string">
+    Volume name
+  </ParamField>
+
+  <ParamField path="--set metro=<string>" type="string" required>
+    Metro where the volume will be created (e.g., `fra`, `lhr`, `ewr`)
+  </ParamField>
+
+  <ParamField path="--set size=<size>" type="size" required>
+    Volume size in MiB (e.g., `10`, `100`, `1000`)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Create a new volume
+  unikraft volume create \
+    --set name=demo-volume \
+    --set size=10 \
+    --set metro=fra
+  ```
+
+  ```bash
+  $ unikraft volume create \
+      --set name=demo-volume \
+      --set size=10 \
+      --set metro=fra
+  Created volume demo-volume in fra
+  NAME   demo-volume
+  STATE  creating
+  SIZE   10Mi
+  METRO  fra
+  ```
+</Accordion>
+
+<Accordion title="edit - Edit a volume">
+  Edit volume configuration.
+
+  ```bash
+  unikraft volume edit <name|uuid> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set size=<size>" type="size">
+    Resize the volume in MiB (can only increase size)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Resize a volume
+  unikraft volume edit demo-volume --set size=20
+  ```
+
+  ```bash
+  $ unikraft volume edit demo-volume --set size=20
+  Updated volume demo-volume
+  - SIZE  10Mi → 20Mi
+  ```
+</Accordion>
+
+<Accordion title="delete - Delete volumes">
+  Delete one or more volumes.
+
+  ```bash
+  unikraft volume delete <name|uuid>... [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Delete a volume by name or UUID
+  unikraft volume delete demo-volume
+  ```
+
+  ```bash
+  $ unikraft volume delete demo-volume
+  Deleted volume demo-volume
+  ```
+</Accordion>
+
+<Accordion title="clone - Clone a volume">
+  Create a copy of an existing volume.
+
+  ```bash
+  unikraft volume clone <name|uuid> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set name=<string>" type="string">
+    Name for the cloned volume
+  </ParamField>
+
+  <ParamField path="--set tags=<tag>" type="array">
+    Tags to apply to the cloned volume
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Clone a volume with a new name
+  unikraft volume clone demo-volume --set name=demo-volume-clone
+  ```
+
+  ```bash
+  $ unikraft volume clone demo-volume --set name=demo-volume-clone
+  Cloned volume demo-volume to demo-volume-clone
+  NAME                demo-volume-clone
+  STATE               creating
+  SIZE                10Mi
+  METRO               fra
+  ```
+</Accordion>
+
+## Volume Mount Specification
+
+When attaching volumes to instances, use the format:
+
+```
+NAME|UUID:PATH[:ro][:size=SIZE]
+```
+
+- `NAME|UUID` - Volume name or UUID (use empty string to create ephemeral volume)
+- `PATH` - Mount path inside the instance
+- `ro` - Optional read-only flag
+- `size=SIZE` - Optional size for ephemeral volumes in MiB
+
+### Examples
+
+```bash
+# Mount existing volume at /data
+--set volumes=demo-volume:/data
+
+# Mount volume read-only
+--set volumes=demo-volume:/data:ro
+
+# Create ephemeral volume of 100Mi at /tmp
+--set volumes=:/tmp:size=100
+```
+
+## See Also
+
+- [instances](/commands/instances) - Manage instances that use volumes

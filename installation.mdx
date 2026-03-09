@@ -1,0 +1,216 @@
+---
+title: Installation
+description: Install the Unikraft CLI to manage unikernels globally in milliseconds
+---
+
+The Unikraft CLI is the official command-line interface for [Unikraft Cloud](https://unikraft.cloud). It enables you to deploy and manage unikernels as serverless instances across multiple metros worldwide.
+
+## Prerequisites
+
+Before installing the Unikraft CLI, ensure you have:
+
+- A supported operating system (Debian/Ubuntu, Fedora/RHEL/Rocky/Alma, or any Linux with Go installed)
+- Root or sudo access for package installation
+- An active internet connection
+
+## Installation Methods
+
+Choose your preferred installation method based on your operating system.
+
+<Tabs>
+  <Tab title="Debian/Ubuntu">
+    <Steps>
+      <Step title="Update and install dependencies">
+        ```bash
+        sudo apt update
+        sudo apt install ca-certificates curl
+        ```
+      </Step>
+
+      <Step title="Download and add the GPG key">
+        ```bash
+        sudo install -d -m 0755 /etc/apt/keyrings
+
+        sudo curl -fsSL \
+          -o /etc/apt/keyrings/unikraft-cli.gpg \
+          https://pkg.unikraft.com/debian/cli-apt/keys/cli-apt.gpg
+        ```
+      </Step>
+
+      <Step title="Add the Unikraft repository">
+        ```bash
+        sudo tee /etc/apt/sources.list.d/unikraft-cli.sources <<EOF
+        Types: deb
+        URIs: https://pkg.unikraft.com/debian/cli-apt/
+        Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+        Components: stable
+        Signed-By: /etc/apt/keyrings/unikraft-cli.gpg
+        EOF
+        ```
+      </Step>
+
+      <Step title="Install the Unikraft CLI">
+        ```bash
+        sudo apt update
+        sudo apt install unikraft-cli
+        ```
+      </Step>
+
+      <Step title="Verify the installation">
+        ```bash
+        unikraft --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Fedora/RHEL/Rocky/Alma">
+    <Steps>
+      <Step title="Add the Unikraft CLI repository">
+        ```bash
+        sudo tee /etc/yum.repos.d/unikraft-cli-rpm.repo <<EOF
+        [unikraft]
+        name=unikraft
+        baseurl=https://pkg.unikraft.com/rpm/cli-rpm/
+        gpgcheck=0
+        enabled=1
+        EOF
+        ```
+      </Step>
+
+      <Step title="Install the Unikraft CLI">
+        ```bash
+        yum install unikraft-cli
+        ```
+      </Step>
+
+      <Step title="Verify the installation">
+        ```bash
+        unikraft --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="From Source">
+    <Note>
+      Building from source requires:
+      - [Go](https://golang.org/dl/) 1.25 or later
+      - Git
+      - GNU Make or [Task](https://taskfile.dev/)
+    </Note>
+
+    <Steps>
+      <Step title="Clone the repository">
+        ```bash
+        git clone https://github.com/unikraft/cli.git
+        cd cli
+        ```
+      </Step>
+
+      <Step title="Build the CLI">
+        ```bash
+        make cli
+        ```
+
+        The binary will be placed in `dist/unikraft`.
+      </Step>
+
+      <Step title="Verify the build">
+        ```bash
+        ./dist/unikraft --version
+        ```
+      </Step>
+
+      <Step title="Optional: Move to system PATH">
+        ```bash
+        sudo mv ./dist/unikraft /usr/local/bin/
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Shell Completion
+
+Enable tab completion for your shell to improve your workflow:
+
+<CodeGroup>
+```bash Bash
+unikraft completion bash > /etc/bash_completion.d/unikraft
+```
+
+```zsh Zsh
+unikraft completion zsh > "${fpath[1]}/_unikraft"
+```
+
+```fish Fish
+unikraft completion fish > ~/.config/fish/completions/unikraft.fish
+```
+
+```powershell PowerShell
+unikraft completion powershell > unikraft.ps1
+```
+</CodeGroup>
+
+<Tip>
+After installing shell completion, restart your terminal or source your shell's configuration file for the changes to take effect.
+</Tip>
+
+## Configuration Location
+
+The CLI stores its configuration at:
+
+- **Linux**: `~/.config/unikraft/config.yaml`
+- **macOS**: `~/Library/Application Support/unikraft/config.yaml`
+
+You can override this location with the `UNIKRAFT_CONFIG` environment variable.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Deploy your first unikernel instance
+  </Card>
+  <Card title="Command Reference" icon="terminal" href="/commands/run">
+    Explore all available commands
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not found after installation">
+    If you receive a "command not found" error after installation:
+    
+    1. Verify the installation completed successfully
+    2. Close and reopen your terminal
+    3. Check if `/usr/bin` or `/usr/local/bin` is in your PATH:
+       ```bash
+       echo $PATH
+       ```
+    4. If installing from source, ensure you moved the binary to a directory in your PATH
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    If you encounter permission errors:
+    
+    - Ensure you're using `sudo` for system-level package installation
+    - For the from-source build, verify you have write permissions to the directory
+    - Check that the binary has execute permissions: `chmod +x /usr/local/bin/unikraft`
+  </Accordion>
+
+  <Accordion title="GPG key verification failed">
+    If the GPG key verification fails on Debian/Ubuntu:
+    
+    1. Ensure `ca-certificates` is installed and up to date
+    2. Try re-downloading the GPG key
+    3. Verify your internet connection allows HTTPS traffic
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+- Report issues at [github.com/unikraft/cli/issues](https://github.com/unikraft/cli/issues)
+- Visit the [Unikraft documentation](https://unikraft.com/docs)
+- Join the [Unikraft community](https://unikraft.com)

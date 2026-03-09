@@ -1,0 +1,237 @@
+---
+title: completion
+description: Generate shell completion scripts for the Unikraft CLI
+---
+
+The `completion` command generates shell completion scripts that enable tab completion for the Unikraft CLI in your shell. Completions help you quickly discover commands, subcommands, and flags without memorizing the entire CLI syntax.
+
+## Supported Shells
+
+Shell completions are available for:
+
+- **Bash** — Linux/macOS default shell
+- **Zsh** — macOS default shell (10.15+) and popular Linux shell
+- **Fish** — User-friendly interactive shell
+- **PowerShell** — Windows and cross-platform shell
+
+## Installation
+
+<Tabs>
+  <Tab title="Bash">
+    <Steps>
+      <Step title="Generate the completion script">
+        Generate the Bash completion script and save it to the system completions directory:
+
+        ```bash
+        unikraft completion bash > /etc/bash_completion.d/unikraft
+        ```
+
+        If you don't have root access, you can save it to a user directory:
+
+        ```bash
+        mkdir -p ~/.local/share/bash-completion/completions
+        unikraft completion bash > ~/.local/share/bash-completion/completions/unikraft
+        ```
+      </Step>
+
+      <Step title="Reload your shell">
+        Start a new shell session or reload your current one:
+
+        ```bash
+        source ~/.bashrc
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      On some systems, you may need to install `bash-completion` package first:
+      ```bash
+      # Debian/Ubuntu
+      sudo apt install bash-completion
+      
+      # Fedora/RHEL
+      sudo yum install bash-completion
+      ```
+    </Note>
+  </Tab>
+
+  <Tab title="Zsh">
+    <Steps>
+      <Step title="Generate the completion script">
+        Generate the Zsh completion script and save it to your `fpath`:
+
+        ```zsh
+        unikraft completion zsh > "${fpath[1]}/_unikraft"
+        ```
+
+        Alternatively, you can save it to a custom directory:
+
+        ```zsh
+        mkdir -p ~/.zsh/completions
+        unikraft completion zsh > ~/.zsh/completions/_unikraft
+        ```
+      </Step>
+
+      <Step title="Update your fpath (if using custom directory)">
+        If you saved the completion to a custom directory, add it to your `fpath` in `~/.zshrc`:
+
+        ```zsh
+        fpath=(~/.zsh/completions $fpath)
+        ```
+      </Step>
+
+      <Step title="Enable completions">
+        Ensure completions are enabled in your `~/.zshrc`:
+
+        ```zsh
+        autoload -Uz compinit
+        compinit
+        ```
+      </Step>
+
+      <Step title="Reload your shell">
+        Start a new shell session or reload your current one:
+
+        ```zsh
+        source ~/.zshrc
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      You may need to delete `~/.zcompdump` and restart your shell if completions don't appear immediately.
+    </Note>
+  </Tab>
+
+  <Tab title="Fish">
+    <Steps>
+      <Step title="Generate the completion script">
+        Generate the Fish completion script and save it to the Fish completions directory:
+
+        ```fish
+        unikraft completion fish > ~/.config/fish/completions/unikraft.fish
+        ```
+
+        The directory will be created automatically if it doesn't exist.
+      </Step>
+
+      <Step title="Reload completions">
+        Fish automatically loads completions from this directory. Start a new shell session or run:
+
+        ```fish
+        source ~/.config/fish/completions/unikraft.fish
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      Fish will automatically load the completion script for all new shell sessions.
+    </Note>
+  </Tab>
+
+  <Tab title="PowerShell">
+    <Steps>
+      <Step title="Generate the completion script">
+        Generate the PowerShell completion script:
+
+        ```powershell
+        unikraft completion powershell > unikraft.ps1
+        ```
+      </Step>
+
+      <Step title="Load the script in your profile">
+        Add the following line to your PowerShell profile to load completions automatically:
+
+        ```powershell
+        . /path/to/unikraft.ps1
+        ```
+
+        Find your profile location with:
+
+        ```powershell
+        echo $PROFILE
+        ```
+      </Step>
+
+      <Step title="Reload your profile">
+        Reload your PowerShell profile:
+
+        ```powershell
+        . $PROFILE
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      You may need to adjust your execution policy to run the completion script:
+      ```powershell
+      Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+      ```
+    </Note>
+  </Tab>
+</Tabs>
+
+## Usage
+
+Once installed, you can use tab completion to discover and autocomplete commands:
+
+```bash
+# Press Tab to see available commands
+unikraft <Tab>
+
+# Autocomplete subcommands
+unikraft instances <Tab>
+
+# Autocomplete flags
+unikraft run --<Tab>
+```
+
+## Syntax
+
+```bash
+unikraft completion <shell>
+```
+
+### Arguments
+
+| Argument | Description |
+| -------- | ----------- |
+| `shell`  | Shell type: `bash`, `zsh`, `fish`, or `powershell` |
+
+### Examples
+
+```bash
+# Generate Bash completion
+unikraft completion bash
+
+# Generate Zsh completion
+unikraft completion zsh
+
+# Generate Fish completion
+unikraft completion fish
+
+# Generate PowerShell completion
+unikraft completion powershell
+```
+
+## Troubleshooting
+
+### Completions not working
+
+1. Verify the completion script is in the correct location for your shell
+2. Ensure your shell configuration is loading completions
+3. Try starting a new shell session
+4. For Zsh, delete `~/.zcompdump` and restart your shell
+
+### Permission denied
+
+If you get a permission error when saving to system directories (like `/etc/bash_completion.d/`), either:
+- Use `sudo` to run the command with elevated privileges
+- Save to a user directory instead (see shell-specific instructions above)
+
+### Completion script not found
+
+If your shell can't find the completion script, verify:
+- The file was created in the expected location
+- The file has the correct name (including the leading `_` for Zsh)
+- The directory is in your shell's completion search path

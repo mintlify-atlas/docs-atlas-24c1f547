@@ -1,0 +1,415 @@
+---
+title: 'instances'
+description: 'Manage Unikraft Cloud instances'
+---
+
+Manage instances in Unikraft Cloud. Instances are running unikernels that execute your applications.
+
+## Usage
+
+```bash
+unikraft instance [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List instances">
+  List all instances across metros.
+
+  ```bash
+  unikraft instance list [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # List instances across metros
+  unikraft instance list
+  ```
+
+  ```bash
+  $ unikraft instance list
+  NAME             STATE    CREATED       IMAGE          MEMORY  VCPUS  METRO
+  demo-instance    running  5 minutes ago nginx:latest   128Mi   1      fra
+  test-app         stopped  2 hours ago   my-app:v1.0    256Mi   2      lhr
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect an instance">
+  Get detailed information about one or more instances by name or UUID.
+
+  ```bash
+  unikraft instance get <name|uuid> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Inspect an instance by name or UUID
+  unikraft instance get demo-instance
+  ```
+
+  ```bash
+  $ unikraft instance get demo-instance
+  NAME           demo-instance
+  UUID           550e8400-e29b-41d4-a716-446655440000
+  STATE          running
+  IMAGE          nginx:latest
+  MEMORY         128Mi
+  VCPUS          1
+  METRO          fra
+  CREATED        5 minutes ago
+  ARGS           []
+  DOMAINS        demo.unikraft.dev
+  SERVICE        demo-service
+  ```
+</Accordion>
+
+<Accordion title="create - Create a new instance">
+  Create one or more new instances.
+
+  ```bash
+  unikraft instance create [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set name=<string>" type="string">
+    Instance name
+  </ParamField>
+
+  <ParamField path="--set metro=<string>" type="string" required>
+    Metro where the instance will run (e.g., `fra`, `lhr`, `ewr`)
+  </ParamField>
+
+  <ParamField path="--set image=<string>" type="string" required>
+    Container image to run
+  </ParamField>
+
+  <ParamField path="--set resources.memory=<size>" type="size">
+    Memory allocation in MiB (e.g., `128`, `256`, `512`)
+  </ParamField>
+
+  <ParamField path="--set resources.vcpus=<int>" type="integer">
+    Number of virtual CPUs
+  </ParamField>
+
+  <ParamField path="--set runtime.args=<args>" type="array">
+    Command-line arguments for the instance
+  </ParamField>
+
+  <ParamField path="--set runtime.env=<key=value>" type="map">
+    Environment variables (can be specified multiple times)
+  </ParamField>
+
+  <ParamField path="--set volumes=<spec>" type="array">
+    Volume mount specification in format `NAME|UUID:PATH[:ro][:size=SIZE]`
+  </ParamField>
+
+  <ParamField path="--set service.uuid=<uuid>" type="string">
+    Attach to existing service group by UUID
+  </ParamField>
+
+  <ParamField path="--set service.name=<string>" type="string">
+    Attach to existing service group by name
+  </ParamField>
+
+  <ParamField path="--set service.services=<spec>" type="array">
+    Service port mappings in format `SOURCE:DEST/HANDLERS` (e.g., `443:8080/tls+http`)
+  </ParamField>
+
+  <ParamField path="--set service.domains=<domain>" type="array">
+    Domain names to associate with the service
+  </ParamField>
+
+  <ParamField path="--set autostart=<bool>" type="boolean">
+    Start the instance automatically after creation
+  </ParamField>
+
+  <ParamField path="--set replicas=<int>" type="integer">
+    Number of instance replicas to create
+  </ParamField>
+
+  <ParamField path="--set restart.policy=<policy>" type="string">
+    Restart policy for the instance (e.g., `always`, `on-failure`, `never`)
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.policy=<policy>" type="string">
+    Scale-to-zero policy
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.stateful=<bool>" type="boolean">
+    Enable stateful scale-to-zero
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.cooldown-time=<ms>" type="integer">
+    Cooldown time in milliseconds before scaling to zero
+  </ParamField>
+
+  <ParamField path="--set features=<feature>" type="array">
+    Enable specific instance features
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Create a new instance
+  unikraft instance create \
+    --set name=demo-instance \
+    --set metro=fra \
+    --set image=nginx:latest \
+    --set autostart=true \
+    --set resources.memory=128 \
+    --set resources.vcpus=1
+  ```
+
+  ```bash
+  $ unikraft instance create \
+      --set name=demo-instance \
+      --set metro=fra \
+      --set image=nginx:latest \
+      --set autostart=true \
+      --set resources.memory=128 \
+      --set resources.vcpus=1
+  Created instance demo-instance in fra
+  NAME           demo-instance
+  STATE          starting
+  IMAGE          nginx:latest
+  MEMORY         128Mi
+  VCPUS          1
+  METRO          fra
+  ```
+</Accordion>
+
+<Accordion title="edit - Edit an instance">
+  Edit instance configuration.
+
+  ```bash
+  unikraft instance edit <name|uuid> [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set state=<state>" type="string">
+    Change instance state (`running` or `stopped`)
+  </ParamField>
+
+  <ParamField path="--set image=<string>" type="string">
+    Update the container image
+  </ParamField>
+
+  <ParamField path="--set resources.memory=<size>" type="size">
+    Update memory allocation in MiB
+  </ParamField>
+
+  <ParamField path="--set resources.vcpus=<int>" type="integer">
+    Update number of virtual CPUs
+  </ParamField>
+
+  <ParamField path="--set runtime.args=<args>" type="array">
+    Update command-line arguments
+  </ParamField>
+
+  <ParamField path="--set runtime.env=<key=value>" type="map">
+    Set or update environment variables
+  </ParamField>
+
+  <ParamField path="--add runtime.env=<key=value>" type="map">
+    Add environment variables
+  </ParamField>
+
+  <ParamField path="--del runtime.env=<key>" type="array">
+    Delete environment variables by key
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.policy=<policy>" type="string">
+    Update scale-to-zero policy
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.stateful=<bool>" type="boolean">
+    Update stateful scale-to-zero setting
+  </ParamField>
+
+  <ParamField path="--set scale-to-zero.cooldown-time=<ms>" type="integer">
+    Update cooldown time in milliseconds
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Resize instance memory
+  unikraft instance edit demo-instance --set resources.memory=256
+  ```
+
+  ```bash
+  $ unikraft instance edit demo-instance --set resources.memory=256
+  Updated instance demo-instance
+  - MEMORY  128Mi → 256Mi
+  ```
+</Accordion>
+
+<Accordion title="delete - Delete instances">
+  Delete one or more instances.
+
+  ```bash
+  unikraft instance delete <name|uuid>... [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Delete an instance by name or UUID
+  unikraft instance delete demo-instance
+  ```
+
+  ```bash
+  $ unikraft instance delete demo-instance
+  Deleted instance demo-instance
+  ```
+</Accordion>
+
+<Accordion title="logs - Fetch instance logs">
+  Fetch and display logs from one or more instances.
+
+  ```bash
+  unikraft instance logs <name|uuid>... [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--tail <int>" type="integer">
+    Number of lines to show from the end of the logs
+  </ParamField>
+
+  <ParamField path="-f, --follow" type="boolean">
+    Follow log output in real-time
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Fetch logs from an instance
+  unikraft instance logs my-instance
+  ```
+
+  ```bash
+  # Fetch the last 100 lines of logs from an instance
+  unikraft instance logs my-instance --tail 100
+  ```
+
+  ```bash
+  # Follow logs from an instance in real-time
+  unikraft instance logs my-instance --follow
+  ```
+
+  ```bash
+  $ unikraft instance logs demo-instance --tail 20
+  [demo-instance] 2026-03-09T10:15:30Z Starting nginx
+  [demo-instance] 2026-03-09T10:15:30Z Listening on port 8080
+  [demo-instance] 2026-03-09T10:15:35Z Received request: GET /
+  ```
+</Accordion>
+
+<Accordion title="start - Start instances">
+  Start one or more stopped instances.
+
+  ```bash
+  unikraft instance start <name|uuid>... [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Start an instance
+  unikraft instance start demo-instance
+  ```
+
+  ```bash
+  $ unikraft instance start demo-instance
+  Started instance demo-instance
+  + STATE  stopped → starting
+  ```
+</Accordion>
+
+<Accordion title="stop - Stop instances">
+  Stop one or more running instances.
+
+  ```bash
+  unikraft instance stop <name|uuid>... [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--force" type="boolean">
+    Force stop the instance immediately without graceful shutdown
+  </ParamField>
+
+  <ParamField path="--drain-timeout <ms>" type="integer" default="-1">
+    Timeout in milliseconds for draining connections before stopping
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Stop an instance
+  unikraft instance stop demo-instance
+  ```
+
+  ```bash
+  # Stop with a drain timeout
+  unikraft instance stop demo-instance --drain-timeout 30000
+  ```
+
+  ```bash
+  # Force stop an instance
+  unikraft instance stop demo-instance --force
+  ```
+
+  ```bash
+  $ unikraft instance stop demo-instance
+  Stopped instance demo-instance
+  - STATE  running → stopped
+  ```
+</Accordion>
+
+<Accordion title="restart - Restart instances">
+  Restart one or more instances.
+
+  ```bash
+  unikraft instance restart <name|uuid>... [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--force" type="boolean">
+    Force restart the instance immediately
+  </ParamField>
+
+  <ParamField path="--drain-timeout <ms>" type="integer" default="-1">
+    Timeout in milliseconds for draining connections before restarting
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Restart an instance
+  unikraft instance restart demo-instance
+  ```
+
+  ```bash
+  # Force restart an instance
+  unikraft instance restart demo-instance --force
+  ```
+
+  ```bash
+  $ unikraft instance restart demo-instance
+  Restarted instance demo-instance
+  STATE  running → stopped → starting
+  ```
+</Accordion>
+
+## See Also
+
+- [volumes](/commands/volumes) - Manage persistent storage
+- [services](/commands/services) - Manage service groups
+- [images](/commands/images) - Manage container images

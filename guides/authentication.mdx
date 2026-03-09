@@ -1,0 +1,269 @@
+---
+title: Authentication
+description: Learn how to authenticate with Unikraft Cloud and manage your login credentials
+---
+
+The Unikraft CLI requires authentication to interact with Unikraft Cloud resources. This guide covers logging in, managing authentication tokens, and troubleshooting common authentication issues.
+
+## Login Methods
+
+The CLI supports two authentication methods: interactive browser-based login and token-based authentication.
+
+### Interactive Browser Login
+
+The recommended method for authentication is the interactive browser flow:
+
+<Steps>
+  <Step title="Initiate login">
+    Run the login command:
+    ```bash
+    unikraft login
+    ```
+  </Step>
+
+  <Step title="Complete authentication">
+    The CLI will automatically open your browser to the Unikraft Cloud authentication page. If the browser doesn't open automatically, copy and paste the URL displayed in your terminal.
+  </Step>
+
+  <Step title="Confirm authentication">
+    After authenticating in the browser, return to your terminal. The CLI will confirm successful authentication and display your organization name.
+  </Step>
+</Steps>
+
+### Token-Based Authentication
+
+For automated workflows, CI/CD pipelines, or environments without browser access, use token-based authentication:
+
+<Steps>
+  <Step title="Obtain an API token">
+    Generate an API token from the [Unikraft Cloud Console](https://console.unikraft.cloud).
+  </Step>
+
+  <Step title="Save the token">
+    Store the token in a file for security:
+    ```bash
+    echo "your-token-here" > ~/.unikraft-token
+    chmod 600 ~/.unikraft-token
+    ```
+  </Step>
+
+  <Step title="Login with the token">
+    Provide the token file to the login command:
+    ```bash
+    unikraft login --token ~/.unikraft-token
+    ```
+
+    Or read from stdin:
+    ```bash
+    cat ~/.unikraft-token | unikraft login --token -
+    ```
+  </Step>
+</Steps>
+
+## Login Options
+
+### Custom Control Plane Endpoint
+
+Connect to a specific control plane endpoint:
+
+```bash
+unikraft login --controlplane https://controlplane.example.com
+```
+
+### Disable Browser Auto-Open
+
+Prevent automatic browser opening during interactive login:
+
+```bash
+unikraft login --no-browser
+```
+
+The CLI will display the authentication URL for you to open manually.
+
+### Login Timeout
+
+Set a custom timeout for the authentication flow (default: 5 minutes):
+
+```bash
+unikraft login --timeout 10m
+```
+
+### Allow Insecure Connections
+
+For development or testing environments, skip TLS verification:
+
+```bash
+unikraft login --allow-insecure
+```
+
+<Warning>
+  Never use `--allow-insecure` in production environments as it exposes your credentials to potential interception.
+</Warning>
+
+## Verifying Authentication
+
+Check if you're currently authenticated:
+
+```bash
+unikraft login --check
+```
+
+This command verifies that a valid token exists in your current profile.
+
+## Configuration Storage
+
+Authentication credentials are stored in the CLI configuration file:
+
+- **Linux**: `~/.config/unikraft/config.yaml`
+- **macOS**: `~/Library/Application Support/unikraft/config.yaml`
+- **Windows**: `%APPDATA%\unikraft\config.yaml`
+
+The configuration file contains:
+
+```yaml
+profile: default
+profiles:
+  default:
+    type: cloud
+    organization: my-org
+    token: <api-token>
+    controlplane: https://controlplane.unikraft.cloud
+    metros:
+      - name: fra
+        endpoint: https://api.fra.unikraft.cloud
+        country: de
+```
+
+<Info>
+  Protect your configuration file with appropriate permissions:
+  ```bash
+  chmod 600 ~/.config/unikraft/config.yaml
+  ```
+</Info>
+
+## Multiple Organizations
+
+When logging in to multiple organizations, the CLI automatically creates separate profiles:
+
+<Steps>
+  <Step title="Login to first organization">
+    ```bash
+    unikraft login
+    ```
+    This creates a profile named after your organization.
+  </Step>
+
+  <Step title="Login to additional organizations">
+    ```bash
+    unikraft login
+    ```
+    Each organization gets its own profile. If a profile name conflicts, the CLI appends a numeric suffix (e.g., `my-org-2`).
+  </Step>
+
+  <Step title="Switch between profiles">
+    Use the profile management commands to switch contexts:
+    ```bash
+    unikraft profile list
+    unikraft profile use my-org
+    ```
+  </Step>
+</Steps>
+
+## Logout
+
+Remove authentication credentials from your current profile:
+
+```bash
+unikraft logout
+```
+
+This removes the token from your configuration file but preserves other profile settings like metro configurations.
+
+## Troubleshooting
+
+### Authentication Timeout
+
+If authentication times out:
+
+1. Check your network connection
+2. Increase the timeout duration: `unikraft login --timeout 15m`
+3. Verify the control plane endpoint is accessible
+
+### Token Not Found
+
+If you receive a "no authentication token found" error:
+
+1. Verify you've logged in: `unikraft login --check`
+2. Check the configuration file exists and has valid permissions
+3. Re-authenticate: `unikraft login`
+
+### Profile Not Found
+
+If your profile cannot be found:
+
+```bash
+# List available profiles
+unikraft profile list
+
+# Verify the current profile
+unikraft profile get
+
+# Switch to the correct profile
+unikraft profile use <profile-name>
+```
+
+### Invalid Token
+
+If your token is expired or invalid:
+
+1. Log out and re-authenticate:
+   ```bash
+   unikraft logout
+   unikraft login
+   ```
+
+2. If using token-based auth, generate a new token from the console
+
+## Environment Variables
+
+Override authentication settings using environment variables:
+
+```bash
+# Use a different configuration file
+export UNIKRAFT_CONFIG=/path/to/config.yaml
+
+# Override the current profile
+export UNIKRAFT_PROFILE=staging
+```
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Protect Your Token" icon="shield">
+    Never commit tokens to version control. Use environment variables or secure secret management systems in CI/CD.
+  </Card>
+
+  <Card title="Use Profile Separation" icon="users">
+    Maintain separate profiles for development, staging, and production environments.
+  </Card>
+
+  <Card title="Regular Rotation" icon="rotate">
+    Periodically rotate API tokens, especially for automated systems.
+  </Card>
+
+  <Card title="Limit Permissions" icon="lock">
+    Use tokens with the minimum required permissions for your use case.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Profile Management" icon="user-group" href="/guides/profiles">
+    Learn how to manage multiple profiles and switch between accounts
+  </Card>
+
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Start deploying unikernel instances to Unikraft Cloud
+  </Card>
+</CardGroup>

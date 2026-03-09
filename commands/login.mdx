@@ -1,0 +1,150 @@
+---
+title: unikraft login
+description: Authenticate with Unikraft Cloud
+---
+
+## Syntax
+
+```bash
+unikraft login [OPTIONS]
+```
+
+## Description
+
+Authenticate with Unikraft Cloud to enable cloud operations. The login command supports two authentication methods:
+
+1. **Browser-based authentication** (default): Opens a browser window for interactive OAuth-based login
+2. **Token file authentication**: Reads an authentication token from a file or stdin
+
+When you log in, the CLI creates or updates a profile associated with your organization. The profile stores your authentication token, organization details, and available metros (regions). If a profile for your organization already exists, it will be updated with the new token.
+
+## Options
+
+<ParamField path="--check" type="boolean" default="false">
+  Check if the user is already logged in without initiating a new login flow. Returns success if a valid authentication token exists.
+</ParamField>
+
+<ParamField path="--timeout" type="duration" default="5m">
+  Timeout for the login request. Accepts duration strings like `1m`, `30s`, or `5m30s`. The login will fail if authentication is not completed within this time.
+</ParamField>
+
+<ParamField path="--controlplane" type="string" default="https://controlplane.unikraft.cloud">
+  Control plane URL to use for login. Useful for testing or connecting to alternative Unikraft Cloud deployments.
+</ParamField>
+
+<ParamField path="--allow-insecure" type="boolean" default="false">
+  Allow insecure server connections when using SSL. Use with caution, only for testing purposes.
+</ParamField>
+
+<ParamField path="--no-browser" type="boolean" default="false">
+  Do not open the browser automatically for login. When enabled, you must manually visit the authentication URL displayed in the terminal.
+</ParamField>
+
+<ParamField path="--token" type="file">
+  Path to a file containing the authentication token. Use `-` to read the token from stdin. When this option is used, browser-based authentication is skipped.
+</ParamField>
+
+<ParamField path="--organization" type="string">
+  Organization to associate the login with. Required when using `--token`. Automatically detected during browser-based authentication.
+</ParamField>
+
+## Examples
+
+### Interactive browser login
+
+```bash
+unikraft login
+```
+
+This opens your default browser to authenticate with Unikraft Cloud. After successful authentication, your credentials are saved to the active profile.
+
+```
+to authenticate, please visit:
+
+  https://controlplane.unikraft.cloud/auth/cli/authorize?request_id=...
+
+waiting for confirmation timeout=5m0s
+authenticated organization=myorg
+login successful profile=myorg
+```
+
+### Login without browser
+
+```bash
+unikraft login --no-browser
+```
+
+Displays the authentication URL without opening a browser. Useful for remote or headless environments.
+
+```
+to authenticate, please visit:
+
+  https://controlplane.unikraft.cloud/auth/cli/authorize?request_id=...
+
+waiting for confirmation timeout=5m0s
+```
+
+### Login with token file
+
+```bash
+unikraft login --token /path/to/token.txt --organization myorg
+```
+
+Reads the authentication token from a file and associates it with the specified organization.
+
+### Login with token from stdin
+
+```bash
+echo "uk_token_xxxxx" | unikraft login --token - --organization myorg
+```
+
+Reads the authentication token from stdin.
+
+### Check login status
+
+```bash
+unikraft login --check
+```
+
+Verifies whether you're currently authenticated:
+
+```
+existing authentication token found organization=myorg
+```
+
+Or if not authenticated:
+
+```
+Error: no existing authentication token found
+```
+
+### Login with custom timeout
+
+```bash
+unikraft login --timeout 10m
+```
+
+Sets a longer timeout for the authentication flow.
+
+### Login to custom control plane
+
+```bash
+unikraft login --controlplane https://staging.unikraft.cloud
+```
+
+Authenticate with a custom control plane endpoint (for testing or alternative deployments).
+
+## Profile Management
+
+The login command automatically manages profiles based on your organization:
+
+- If a profile for your organization already exists, it will be updated with the new token
+- If logging into a different control plane for the same organization, a new profile with a numeric suffix is created (e.g., `myorg-2`)
+- The newly created or updated profile is automatically set as the default profile
+- Metro (region) information is fetched and stored in the profile during login
+
+## Related Commands
+
+- [`unikraft logout`](/commands/logout) - Log out from the current profile
+- [`unikraft profile`](/commands/profile) - Manage and switch between profiles
+- [`unikraft profile use`](/commands/profile#use) - Switch to a different profile

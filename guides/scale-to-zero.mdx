@@ -1,0 +1,548 @@
+---
+title: Scale-to-Zero
+description: Optimize costs with automatic scale-to-zero policies for your Unikraft Cloud instances
+---
+
+Scale-to-zero is a cost optimization feature that automatically stops instances during periods of inactivity and restarts them on demand when traffic arrives. This guide explains how to configure and optimize scale-to-zero policies.
+
+## How Scale-to-Zero Works
+
+When scale-to-zero is enabled:
+
+1. **Active Period**: Instance runs normally and handles requests
+2. **Cooldown Period**: After the configured cooldown time with no traffic, instance preparation begins
+3. **Scaled Down**: Instance stops and consumes no compute resources
+4. **Auto-Restart**: First incoming request triggers instance restart
+5. **Resume**: Instance returns to active state and handles traffic
+
+### Benefits
+
+- **Cost Savings**: Pay only for actual compute time, not idle time
+- **Automatic Management**: No manual intervention required
+- **Fast Boot**: Unikernels boot in milliseconds, minimizing latency
+- **Resource Efficiency**: Free up capacity for other workloads
+
+## Enabling Scale-to-Zero
+
+### During Instance Deployment
+
+Enable scale-to-zero when deploying an instance:
+
+```bash
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  my-app:latest
+```
+
+This configuration:
+- Enables scale-to-zero (`policy=on`)
+- Waits 5 minutes (300,000 ms) of inactivity before scaling down
+
+### For Existing Instances
+
+Enable scale-to-zero on a running instance:
+
+```bash
+unikraft instances edit my-instance \
+  --set scale-to-zero.policy=on \
+  --set scale-to-zero.cooldown-time=300000
+```
+
+## Configuration Options
+
+### Policy
+
+Control whether scale-to-zero is enabled:
+
+<CodeGroup>
+```bash Enable
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  my-app:latest
+```
+
+```bash Disable
+unikraft instances edit my-instance \
+  --set scale-to-zero.policy=off
+```
+</CodeGroup>
+
+### Cooldown Time
+
+Time (in milliseconds) to wait after last activity before scaling down:
+
+<CodeGroup>
+```bash 1 Minute
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=60000 \
+  my-app:latest
+```
+
+```bash 5 Minutes (Recommended)
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  my-app:latest
+```
+
+```bash 10 Minutes
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=600000 \
+  my-app:latest
+```
+
+```bash 30 Minutes
+unikraft run --metro fra \
+  --scale-to-zero policy=on,cooldown-time=1800000 \
+  my-app:latest
+```
+</CodeGroup>
+
+### Stateful Mode
+
+Preserve instance state during scale-down:
+
+```bash
+unikraft run --metro fra \
+  --scale-to-zero policy=on,stateful=true,cooldown-time=300000 \
+  my-app:latest
+```
+
+With `stateful=true`:
+- Instance memory is preserved during scale-down
+- Faster restart since state doesn't need to be rebuilt
+- Slightly higher cost due to state storage
+
+<Info>
+  Stateful mode is beneficial for applications with expensive initialization processes or in-memory caches.
+</Info>
+
+## Use Case Configurations
+
+### Development Environments
+
+Quick scale-down for cost optimization:
+
+```bash
+unikraft run --metro fra \
+  --name dev-environment \
+  --scale-to-zero policy=on,cooldown-time=60000 \
+  dev-app:latest
+```
+
+- **Cooldown**: 1 minute
+- **Use case**: Development/testing environments used intermittently
+- **Trade-off**: Frequent scaling may cause restarts during development
+
+### API Services
+
+Balanced configuration for APIs:
+
+```bash
+unikraft run --metro fra \
+  --name api-service \
+  -p 443:8080/http+tls \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  api:latest
+```
+
+- **Cooldown**: 5 minutes
+- **Use case**: APIs with variable traffic patterns
+- **Trade-off**: Good balance between cost and availability
+
+### Scheduled Jobs
+
+Longer cooldown for batch processing:
+
+```bash
+unikraft run --metro fra \
+  --name batch-processor \
+  --scale-to-zero policy=on,cooldown-time=600000 \
+  processor:latest
+```
+
+- **Cooldown**: 10 minutes
+- **Use case**: Batch jobs that run periodically
+- **Trade-off**: Ensures completion of longer-running tasks
+
+### Demo Applications
+
+Very quick scale-down for demos:
+
+```bash
+unikraft run --metro fra \
+  --name demo-app \
+  -p 443:3000/http+tls \
+  --domain demo.example.com \
+  --scale-to-zero policy=on,cooldown-time=30000 \
+  demo:latest
+```
+
+- **Cooldown**: 30 seconds
+- **Use case**: Demo environments accessed sporadically
+- **Trade-off**: Maximum cost savings with acceptable cold start latency
+
+### Microservices with Cache
+
+Stateful scale-to-zero for cached data:
+
+```bash
+unikraft run --metro fra \
+  --name cache-service \
+  --scale-to-zero policy=on,stateful=true,cooldown-time=600000 \
+  -e CACHE_SIZE=512MB \
+  cache-service:latest
+```
+
+- **Cooldown**: 10 minutes
+- **Stateful**: Yes (preserves in-memory cache)
+- **Use case**: Services with expensive warm-up or caching
+- **Trade-off**: Faster restarts but higher storage cost
+
+## Managing Scale-to-Zero Instances
+
+### Viewing Scale-to-Zero Status
+
+Check if scale-to-zero is enabled:
+
+```bash
+unikraft instances get my-instance --fields scale-to-zero
+```
+
+Example output:
+
+```
+SCALE-TO-ZERO:
+  ENABLED         true
+  POLICY          on
+  STATEFUL        false
+  COOLDOWN TIME   300000ms (5m)
+```
+
+### Listing Instances by Scale-to-Zero Status
+
+```bash
+# List all instances with scale-to-zero info
+unikraft instances list --fields name,state,scale-to-zero.enabled,scale-to-zero.policy
+
+# JSON output for filtering
+unikraft instances list -o json | \
+  jq '.[] | select(."scale-to-zero".enabled == true)'
+```
+
+### Modifying Scale-to-Zero Configuration
+
+<CodeGroup>
+```bash Change Cooldown Time
+unikraft instances edit my-instance \
+  --set scale-to-zero.cooldown-time=600000
+```
+
+```bash Enable Stateful Mode
+unikraft instances edit my-instance \
+  --set scale-to-zero.stateful=true
+```
+
+```bash Disable Scale-to-Zero
+unikraft instances edit my-instance \
+  --set scale-to-zero.policy=off
+```
+</CodeGroup>
+
+### Forcing Instance Restart
+
+Manually restart a scaled-down instance:
+
+```bash
+unikraft instances start my-instance
+```
+
+## Performance Considerations
+
+### Cold Start Latency
+
+First request after scale-down experiences additional latency:
+
+- **Typical boot time**: 20-100ms for unikernels
+- **Total cold start**: Boot time + application initialization
+- **Mitigation**: Use stateful mode or longer cooldown times
+
+### Measuring Cold Starts
+
+```bash
+# Test cold start time
+time curl https://my-app.example.com
+
+# Multiple requests to see warm vs cold
+for i in {1..5}; do
+  time curl https://my-app.example.com
+  sleep 1
+done
+```
+
+### Optimizing for Fast Restarts
+
+<Steps>
+  <Step title="Minimize initialization">
+    Reduce application startup time:
+    - Lazy-load dependencies
+    - Use lightweight frameworks
+    - Avoid expensive computations at startup
+  </Step>
+
+  <Step title="Consider stateful mode">
+    For apps with expensive warm-up:
+    ```bash
+    unikraft instances edit my-instance \
+      --set scale-to-zero.stateful=true
+    ```
+  </Step>
+
+  <Step title="Optimize cooldown time">
+    Balance between:
+    - Shorter cooldown = more savings, more cold starts
+    - Longer cooldown = fewer cold starts, less savings
+  </Step>
+</Steps>
+
+## Cost Optimization Strategies
+
+### Cooldown Time Selection
+
+Choose cooldown based on traffic patterns:
+
+| Traffic Pattern | Recommended Cooldown | Reasoning |
+|----------------|---------------------|------------|
+| Sporadic (demos, dev) | 30s - 1min | Maximize savings |
+| Variable (APIs) | 5min | Balance cost and availability |
+| Periodic (cron jobs) | 10min+ | Ensure task completion |
+| Bursty (event-driven) | 2-5min | Handle burst clusters |
+
+### Multi-Instance Deployments
+
+Combine scale-to-zero with multiple instances:
+
+```bash
+# Deploy 3 instances with scale-to-zero
+for i in {1..3}; do
+  unikraft run --metro fra \
+    --name api-$i \
+    --service api-service \
+    --scale-to-zero policy=on,cooldown-time=300000 \
+    api:latest
+done
+```
+
+Benefits:
+- Cost savings during low traffic
+- High availability during traffic spikes
+- Load balancing across active instances
+
+### Environment-Based Configuration
+
+<CodeGroup>
+```bash Production
+# Conservative cooldown for production
+unikraft run --metro fra \
+  --name prod-api \
+  --scale-to-zero policy=on,cooldown-time=600000 \
+  api:latest
+```
+
+```bash Staging
+# Moderate cooldown for staging
+unikraft run --metro fra \
+  --name staging-api \
+  --scale-to-zero policy=on,cooldown-time=300000 \
+  api:latest
+```
+
+```bash Development
+# Aggressive cooldown for dev
+unikraft run --metro fra \
+  --name dev-api \
+  --scale-to-zero policy=on,cooldown-time=60000 \
+  api:latest
+```
+</CodeGroup>
+
+## Monitoring Scale-to-Zero
+
+### Instance State Tracking
+
+Monitor when instances scale up/down:
+
+```bash
+# Watch instance state changes
+watch -n 5 'unikraft instances list --fields name,state'
+
+# Check instance uptime
+unikraft instances get my-instance --fields timing.uptime
+```
+
+### Log Analysis
+
+View logs to understand scaling patterns:
+
+```bash
+unikraft instances logs my-instance --tail 100
+```
+
+Look for:
+- Instance start events
+- Application initialization messages
+- First request after cold start
+
+## Advanced Patterns
+
+### Warmup Requests
+
+Keep instances warm with periodic requests:
+
+```bash
+# Cron job to prevent scale-down
+*/4 * * * * curl -s https://my-app.example.com/health > /dev/null
+```
+
+Use when:
+- Cold starts are unacceptable
+- Traffic is predictable
+- Cost of warmup requests < cost of running instance
+
+### Conditional Scale-to-Zero
+
+Different policies based on time of day:
+
+```bash
+# Business hours: disabled
+# After hours: enabled
+
+# 8 AM - disable scale-to-zero
+0 8 * * * unikraft instances edit prod-api --set scale-to-zero.policy=off
+
+# 6 PM - enable scale-to-zero
+0 18 * * * unikraft instances edit prod-api --set scale-to-zero.policy=on
+```
+
+### Graduated Cooldown
+
+Start with short cooldown, increase if needed:
+
+<Steps>
+  <Step title="Start aggressive">
+    ```bash
+    unikraft run --metro fra \
+      --scale-to-zero policy=on,cooldown-time=60000 \
+      my-app:latest
+    ```
+  </Step>
+
+  <Step title="Monitor performance">
+    Track cold start frequency and user experience.
+  </Step>
+
+  <Step title="Adjust if needed">
+    ```bash
+    unikraft instances edit my-app \
+      --set scale-to-zero.cooldown-time=300000
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Frequent Cold Starts
+
+If instances restart too often:
+
+1. **Increase cooldown time**:
+   ```bash
+   unikraft instances edit my-instance \
+     --set scale-to-zero.cooldown-time=600000
+   ```
+
+2. **Enable stateful mode**:
+   ```bash
+   unikraft instances edit my-instance \
+     --set scale-to-zero.stateful=true
+   ```
+
+3. **Disable for high-traffic periods**:
+   ```bash
+   unikraft instances edit my-instance \
+     --set scale-to-zero.policy=off
+   ```
+
+### Instance Not Scaling Down
+
+If an instance stays running:
+
+1. **Check scale-to-zero is enabled**:
+   ```bash
+   unikraft instances get my-instance --fields scale-to-zero.policy
+   ```
+
+2. **Verify no active traffic**:
+   ```bash
+   unikraft instances logs my-instance --tail 50
+   ```
+
+3. **Check cooldown time**:
+   ```bash
+   unikraft instances get my-instance --fields scale-to-zero.cooldown-time
+   ```
+
+### Unexpected Restarts
+
+If instances restart unexpectedly:
+
+1. **Review instance logs**:
+   ```bash
+   unikraft instances logs my-instance --tail 200
+   ```
+
+2. **Check for health check traffic** that may prevent scale-down
+
+3. **Verify restart policy**:
+   ```bash
+   unikraft instances get my-instance --fields restart.policy
+   ```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Conservative" icon="gauge">
+    Begin with longer cooldown times (5-10 minutes) and adjust based on actual usage patterns.
+  </Card>
+
+  <Card title="Monitor Initially" icon="chart-line">
+    Watch instance behavior for the first week after enabling scale-to-zero to optimize settings.
+  </Card>
+
+  <Card title="Match Traffic Patterns" icon="wave-square">
+    Align cooldown times with your application's typical idle periods.
+  </Card>
+
+  <Card title="Use Stateful for Expensive Init" icon="database">
+    Enable stateful mode for applications with significant startup costs.
+  </Card>
+
+  <Card title="Test Cold Starts" icon="stopwatch">
+    Regularly test cold start performance to ensure acceptable user experience.
+  </Card>
+
+  <Card title="Document Configurations" icon="book">
+    Keep track of which instances use scale-to-zero and their specific settings.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Learn how to deploy instances with scale-to-zero enabled
+  </Card>
+
+  <Card title="Service Groups" icon="network-wired" href="/guides/service-groups">
+    Configure load balancing with multiple scale-to-zero instances
+  </Card>
+</CardGroup>

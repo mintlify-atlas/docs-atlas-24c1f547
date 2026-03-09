@@ -1,0 +1,577 @@
+---
+title: TLS Certificates
+description: Manage TLS certificates for secure HTTPS endpoints on Unikraft Cloud
+---
+
+Unikraft Cloud provides automatic TLS certificate provisioning for custom domains, and also supports bringing your own certificates for advanced use cases. This guide covers both automatic and manual certificate management.
+
+## Automatic Certificate Provisioning
+
+When you add a domain to a service group, Unikraft Cloud automatically provisions and manages TLS certificates through Let's Encrypt.
+
+### How It Works
+
+<Steps>
+  <Step title="Add domain to service group">
+    ```bash
+    unikraft services create \
+      --set name=web-service \
+      --set metro=fra \
+      --set services=443:8080/http+tls \
+      --set domains=www.example.com
+    ```
+  </Step>
+
+  <Step title="Automatic certificate issuance">
+    The platform automatically:
+    - Validates domain ownership via DNS
+    - Issues a certificate from Let's Encrypt
+    - Configures the service group to use the certificate
+  </Step>
+
+  <Step title="Automatic renewal">
+    Certificates are automatically renewed before expiration (typically 30 days before the 90-day expiration).
+  </Step>
+</Steps>
+
+### Benefits of Automatic Certificates
+
+- **Zero configuration**: No manual certificate management required
+- **Automatic renewal**: Never worry about expired certificates
+- **Free**: Let's Encrypt certificates at no additional cost
+- **Industry standard**: 90-day validity with auto-renewal
+
+## Manual Certificate Management
+
+For custom certificates, wildcard domains, or specific compliance requirements, you can upload your own certificates.
+
+## Creating Certificates
+
+Upload a custom TLS certificate:
+
+```bash
+unikraft certificates create \
+  --set name=my-cert \
+  --set cn=example.com \
+  --set-file chain=certificate.pem \
+  --set-file pkey=private-key.pem \
+  --set metro=fra
+```
+
+### Certificate Requirements
+
+- **Common Name (CN)**: Must match the domain (e.g., `example.com` or `*.example.com`)
+- **Certificate Chain**: PEM-formatted certificate (including intermediates)
+- **Private Key**: PEM-formatted private key (unencrypted)
+
+### Preparing Certificates
+
+<Steps>
+  <Step title="Generate or obtain certificate">
+    From a Certificate Authority or self-signed:
+    ```bash
+    # Self-signed certificate (development only)
+    openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+      -subj "/CN=example.com" \
+      -keyout private-key.pem \
+      -out certificate.pem
+    ```
+  </Step>
+
+  <Step title="Combine with intermediate certificates (if needed)">
+    ```bash
+    cat certificate.pem intermediate.pem > chain.pem
+    ```
+  </Step>
+
+  <Step title="Verify certificate format">
+    ```bash
+    openssl x509 -in certificate.pem -text -noout
+    openssl rsa -in private-key.pem -check
+    ```
+  </Step>
+
+  <Step title="Upload to Unikraft Cloud">
+    ```bash
+    unikraft certificates create \
+      --set name=my-cert \
+      --set cn=example.com \
+      --set-file chain=chain.pem \
+      --set-file pkey=private-key.pem \
+      --set metro=fra
+    ```
+  </Step>
+</Steps>
+
+## Listing Certificates
+
+View all certificates:
+
+```bash
+unikraft certificates list
+```
+
+Example output:
+
+```
+METRO  NAME           UUID                                  STATE   COMMON NAME      EXPIRES
+fra    my-cert        550e8400-e29b-41d4-a716-446655440000  active  example.com      in 89 days
+fra    wildcard-cert  6ba7b810-9dad-11d1-80b4-00c04fd430c8  active  *.example.com    in 45 days
+sfo    auto-cert      6ba7b811-9dad-11d1-80b4-00c04fd430c9  active  www.example.com  in 60 days
+```
+
+### JSON Output
+
+```bash
+unikraft certificates list -o json
+```
+
+## Inspecting Certificates
+
+View detailed certificate information:
+
+```bash
+unikraft certificates get my-cert
+```
+
+Example output:
+
+```
+METRO          fra
+NAME           my-cert
+UUID           550e8400-e29b-41d4-a716-446655440000
+COMMON NAME    example.com
+STATE          active
+SUBJECT        CN=example.com
+ISSUER         CN=Let's Encrypt Authority X3
+SERIAL NUMBER  03:fa:41:e2:...
+CREATED        2 hours ago
+NOT BEFORE     2 hours ago
+NOT AFTER      in 89 days
+```
+
+### Specific Fields
+
+```bash
+unikraft certificates get my-cert --fields name,common-name,not-after
+```
+
+## Wildcard Certificates
+
+Wildcard certificates cover all subdomains:
+
+<Steps>
+  <Step title="Generate wildcard certificate">
+    ```bash
+    openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+      -subj "/CN=*.example.com" \
+      -keyout wildcard-key.pem \
+      -out wildcard-cert.pem
+    ```
+  </Step>
+
+  <Step title="Upload to Unikraft Cloud">
+    ```bash
+    unikraft certificates create \
+      --set name=wildcard-example \
+      --set cn="*.example.com" \
+      --set-file chain=wildcard-cert.pem \
+      --set-file pkey=wildcard-key.pem \
+      --set metro=fra
+    ```
+  </Step>
+
+  <Step title="Use with multiple subdomains">
+    ```bash
+    unikraft services create \
+      --set name=multi-subdomain \
+      --set metro=fra \
+      --set services=443:8080/http+tls \
+      --set domains=app.example.com \
+      --set domains=api.example.com \
+      --set domains=admin.example.com
+    ```
+  </Step>
+</Steps>
+
+## Certificate Lifecycle
+
+### Certificate States
+
+| State | Description |
+|-------|-------------|
+| `creating` | Certificate is being processed |
+| `active` | Certificate is valid and in use |
+| `expired` | Certificate has expired |
+| `revoked` | Certificate has been revoked |
+| `error` | Certificate validation failed |
+
+### Monitoring Expiration
+
+Check certificate expiration dates:
+
+```bash
+# View all certificates with expiration
+unikraft certificates list --fields name,common-name,not-after
+
+# Find certificates expiring soon (using jq)
+unikraft certificates list -o json | \
+  jq '.[] | select(.not_after < "2026-04-01")'
+```
+
+### Certificate Renewal
+
+**Automatic certificates**: Renewed automatically 30 days before expiration.
+
+**Manual certificates**: Must be renewed manually:
+
+<Steps>
+  <Step title="Generate new certificate">
+    Obtain a new certificate from your CA or generate a new self-signed certificate.
+  </Step>
+
+  <Step title="Create new certificate resource">
+    ```bash
+    unikraft certificates create \
+      --set name=my-cert-renewed \
+      --set cn=example.com \
+      --set-file chain=new-cert.pem \
+      --set-file pkey=new-key.pem \
+      --set metro=fra
+    ```
+  </Step>
+
+  <Step title="Update service groups">
+    The platform automatically uses the new certificate when the CN matches.
+  </Step>
+
+  <Step title="Delete old certificate">
+    ```bash
+    unikraft certificates delete my-cert
+    ```
+  </Step>
+</Steps>
+
+## Deleting Certificates
+
+Remove a certificate:
+
+```bash
+unikraft certificates delete my-cert
+```
+
+<Warning>
+  Deleting a certificate that's in use by a service group may cause service disruptions. Ensure a valid certificate exists before deletion.
+</Warning>
+
+### Delete Multiple Certificates
+
+```bash
+unikraft certificates delete cert-1 cert-2 cert-3
+```
+
+## Using Certificates with Service Groups
+
+Certificates are automatically associated with service groups based on domain matching.
+
+### Automatic Association
+
+When you add a domain to a service group:
+
+```bash
+unikraft services create \
+  --set name=secure-service \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=example.com
+```
+
+The platform automatically:
+
+1. Searches for a certificate with matching CN in the same metro
+2. Uses that certificate if found
+3. Otherwise, provisions a new Let's Encrypt certificate
+
+### Viewing Certificate Usage
+
+Check which service groups use a certificate:
+
+```bash
+unikraft services get web-service --fields domains
+```
+
+Example output:
+
+```
+DOMAINS  www.example.com (cert: auto-www-example)
+         api.example.com (cert: wildcard-example)
+```
+
+## Common Certificate Scenarios
+
+### Single Domain Certificate
+
+<CodeGroup>
+```bash Generate Certificate
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=www.example.com" \
+  -keyout www-key.pem \
+  -out www-cert.pem
+```
+
+```bash Upload Certificate
+unikraft certificates create \
+  --set name=www-cert \
+  --set cn=www.example.com \
+  --set-file chain=www-cert.pem \
+  --set-file pkey=www-key.pem \
+  --set metro=fra
+```
+
+```bash Use in Service
+unikraft services create \
+  --set name=web \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=www.example.com
+```
+</CodeGroup>
+
+### Multi-Domain (SAN) Certificate
+
+```bash
+# Create certificate with Subject Alternative Names
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=example.com" \
+  -addext "subjectAltName=DNS:example.com,DNS:www.example.com,DNS:api.example.com" \
+  -keyout multi-key.pem \
+  -out multi-cert.pem
+
+# Upload certificate
+unikraft certificates create \
+  --set name=multi-domain \
+  --set cn=example.com \
+  --set-file chain=multi-cert.pem \
+  --set-file pkey=multi-key.pem \
+  --set metro=fra
+
+# Use with multiple domains
+unikraft services create \
+  --set name=multi \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set domains=example.com \
+  --set domains=www.example.com \
+  --set domains=api.example.com
+```
+
+### Development with Self-Signed Certificates
+
+<Warning>
+  Self-signed certificates should **never** be used in production. They generate browser security warnings and are not trusted by default.
+</Warning>
+
+```bash
+# Generate self-signed certificate
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=dev.example.local" \
+  -keyout dev-key.pem \
+  -out dev-cert.pem
+
+# Upload for development environment
+unikraft certificates create \
+  --set name=dev-cert \
+  --set cn=dev.example.local \
+  --set-file chain=dev-cert.pem \
+  --set-file pkey=dev-key.pem \
+  --set metro=fra
+```
+
+### Production with Let's Encrypt
+
+For production, use automatic Let's Encrypt certificates:
+
+```bash
+# Simply add domain - certificate is automatic
+unikraft services create \
+  --set name=production \
+  --set metro=fra \
+  --set services=443:8080/http+tls \
+  --set services=80:443/http+redirect \
+  --set domains=www.example.com
+```
+
+## Certificate Format Requirements
+
+### PEM Format
+
+Certificates must be in PEM (Privacy Enhanced Mail) format:
+
+```
+-----BEGIN CERTIFICATE-----
+MIID...
+-----END CERTIFICATE-----
+```
+
+### Converting from Other Formats
+
+<CodeGroup>
+```bash DER to PEM
+openssl x509 -inform der -in certificate.der -out certificate.pem
+```
+
+```bash PKCS#12 to PEM
+# Extract certificate
+openssl pkcs12 -in certificate.p12 -clcerts -nokeys -out certificate.pem
+
+# Extract private key
+openssl pkcs12 -in certificate.p12 -nocerts -nodes -out private-key.pem
+```
+
+```bash Remove Password from Key
+openssl rsa -in encrypted-key.pem -out private-key.pem
+```
+</CodeGroup>
+
+### Certificate Chain Order
+
+When creating a certificate chain, order matters:
+
+```bash
+# Correct order:
+# 1. Server certificate
+# 2. Intermediate certificate(s)
+# 3. Root certificate (optional)
+
+cat server-cert.pem intermediate-cert.pem > chain.pem
+```
+
+## Troubleshooting
+
+### Certificate Upload Fails
+
+If certificate creation fails:
+
+1. **Verify PEM format**:
+   ```bash
+   openssl x509 -in certificate.pem -text -noout
+   ```
+
+2. **Check private key**:
+   ```bash
+   openssl rsa -in private-key.pem -check
+   ```
+
+3. **Ensure key matches certificate**:
+   ```bash
+   # Certificate modulus
+   openssl x509 -noout -modulus -in certificate.pem | openssl md5
+   
+   # Key modulus
+   openssl rsa -noout -modulus -in private-key.pem | openssl md5
+   # Both should match
+   ```
+
+4. **Remove password from private key**:
+   ```bash
+   openssl rsa -in encrypted.pem -out decrypted.pem
+   ```
+
+### HTTPS Not Working
+
+If HTTPS connections fail:
+
+1. **Check certificate is active**:
+   ```bash
+   unikraft certificates get my-cert --fields state
+   ```
+
+2. **Verify domain matches CN**:
+   ```bash
+   unikraft certificates get my-cert --fields common-name
+   unikraft services get web-service --fields domains
+   ```
+
+3. **Ensure TLS handler is configured**:
+   ```bash
+   unikraft services get web-service --fields services
+   # Should include "http+tls"
+   ```
+
+4. **Test with openssl**:
+   ```bash
+   openssl s_client -connect www.example.com:443 -servername www.example.com
+   ```
+
+### Browser Trust Warnings
+
+If browsers show security warnings:
+
+- **Self-signed certificates**: Expected behavior - add to browser's trusted certificates or use Let's Encrypt
+- **Expired certificates**: Renew the certificate
+- **Incomplete chain**: Include intermediate certificates in chain file
+- **CN mismatch**: Ensure CN matches the domain exactly
+
+### Certificate Renewal Not Working
+
+For automatic certificates:
+
+1. **Check DNS is correct**:
+   ```bash
+   dig www.example.com
+   ```
+
+2. **Verify domain is in service group**:
+   ```bash
+   unikraft services get web-service --fields domains
+   ```
+
+3. **Wait for automatic renewal** (happens 30 days before expiration)
+
+For manual certificates:
+
+1. **Upload new certificate with updated dates**
+2. **Delete old certificate after verifying new one works**
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Let's Encrypt" icon="certificate">
+    For most use cases, automatic Let's Encrypt certificates are the best choice.
+  </Card>
+
+  <Card title="Monitor Expiration" icon="clock">
+    Track certificate expiration dates:
+    ```bash
+    unikraft certificates list --fields name,not-after
+    ```
+  </Card>
+
+  <Card title="Use Wildcard Certs" icon="asterisk">
+    For multiple subdomains, use wildcard certificates to reduce management overhead.
+  </Card>
+
+  <Card title="Secure Private Keys" icon="key">
+    Never commit private keys to version control. Store securely and limit access.
+  </Card>
+
+  <Card title="Plan Renewals" icon="calendar">
+    Renew manual certificates at least 30 days before expiration.
+  </Card>
+
+  <Card title="Test Before Deployment" icon="vial">
+    Verify certificates with openssl before uploading to production.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Service Groups" icon="network-wired" href="/guides/service-groups">
+    Learn how to configure service groups with TLS
+  </Card>
+
+  <Card title="Deploy Instances" icon="rocket" href="/guides/deploying-instances">
+    Deploy instances with HTTPS endpoints
+  </Card>
+</CardGroup>

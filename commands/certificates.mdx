@@ -1,0 +1,200 @@
+---
+title: 'certificates'
+description: 'Manage Unikraft Cloud TLS certificates'
+---
+
+Manage TLS certificates in Unikraft Cloud. Certificates enable HTTPS connections for your services.
+
+## Usage
+
+```bash
+unikraft certificate [command] [flags]
+```
+
+## Subcommands
+
+<Accordion title="list - List certificates">
+  List all certificates across metros.
+
+  ```bash
+  unikraft certificate list [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # List all certificates
+  unikraft certificate list
+  ```
+
+  ```bash
+  $ unikraft certificate list
+  NAME        STATE   CREATED       COMMON NAME         NOT AFTER     METRO
+  demo-cert   ready   1 day ago     demo.unikraft.dev   11 months     fra
+  api-cert    ready   5 days ago    api.example.com     10 months     lhr
+  ```
+</Accordion>
+
+<Accordion title="get - Inspect a certificate">
+  Get detailed information about one or more certificates by name or UUID.
+
+  ```bash
+  unikraft certificate get <name|uuid> [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Get a certificate by name or UUID
+  unikraft certificate get demo-cert
+  ```
+
+  ```bash
+  $ unikraft certificate get demo-cert
+  NAME           demo-cert
+  UUID           880e9722-h59e-74g7-d049-779988773333
+  STATE          ready
+  COMMON NAME    demo.unikraft.dev
+  CREATED        1 day ago
+  NOT AFTER      11 months from now
+  METRO          fra
+  ```
+</Accordion>
+
+<Accordion title="create - Create a new certificate">
+  Upload a TLS certificate.
+
+  ```bash
+  unikraft certificate create [flags]
+  ```
+
+  ### Flags
+
+  <ParamField path="--set name=<string>" type="string">
+    Certificate name
+  </ParamField>
+
+  <ParamField path="--set metro=<string>" type="string" required>
+    Metro where the certificate will be stored (e.g., `fra`, `lhr`, `ewr`)
+  </ParamField>
+
+  <ParamField path="--set cn=<string>" type="string" required>
+    Common name (CN) for the certificate (must end with a dot, e.g., `demo.unikraft.dev.`)
+  </ParamField>
+
+  <ParamField path="--set-file chain=<path>" type="string" required>
+    Path to certificate chain file (PEM format)
+  </ParamField>
+
+  <ParamField path="--set-file pkey=<path>" type="string" required>
+    Path to private key file (PEM format)
+  </ParamField>
+
+  ### Examples
+
+  ```bash
+  # Generate a self-signed certificate
+  openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+    -subj "/CN=demo.unikraft.dev" \
+    -keyout cert.key \
+    -out cert.pem
+  ```
+
+  ```bash
+  # Create a new certificate
+  unikraft certificate create \
+    --set name=demo-cert \
+    --set cn=demo.unikraft.dev. \
+    --set-file chain=cert.pem \
+    --set-file pkey=cert.key \
+    --set metro=fra
+  ```
+
+  ```bash
+  $ unikraft certificate create \
+      --set name=demo-cert \
+      --set cn=demo.unikraft.dev. \
+      --set-file chain=cert.pem \
+      --set-file pkey=cert.key \
+      --set metro=fra
+  Created certificate demo-cert in fra
+  NAME         demo-cert
+  STATE        ready
+  COMMON NAME  demo.unikraft.dev
+  METRO        fra
+  ```
+</Accordion>
+
+<Accordion title="delete - Delete certificates">
+  Delete one or more certificates.
+
+  ```bash
+  unikraft certificate delete <name|uuid>... [flags]
+  ```
+
+  ### Examples
+
+  ```bash
+  # Delete a certificate by name or UUID
+  unikraft certificate delete demo-cert
+  ```
+
+  ```bash
+  $ unikraft certificate delete demo-cert
+  Deleted certificate demo-cert
+  ```
+</Accordion>
+
+## Certificate Requirements
+
+- Certificates must be in PEM format
+- The common name (CN) must end with a trailing dot (e.g., `example.com.`)
+- The certificate chain should include all intermediate certificates
+- Private keys must not be password-protected
+
+## Using Certificates with Services
+
+To use a certificate with a service, the service must have:
+1. A domain that matches the certificate's common name
+2. A service port with the `tls` handler
+
+Example:
+
+```bash
+# Create service with TLS
+unikraft service create \
+  --set name=demo-service \
+  --set metro=fra \
+  --set domains=name=demo \
+  --set services=443:8080/tls+http
+```
+
+The service will automatically use any certificate in the same metro that matches the domain.
+
+## Generating Self-Signed Certificates
+
+For testing purposes, you can generate a self-signed certificate:
+
+```bash
+# Generate certificate and key
+openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
+  -subj "/CN=demo.unikraft.dev" \
+  -keyout cert.key \
+  -out cert.pem
+
+# Upload to Unikraft Cloud
+unikraft certificate create \
+  --set name=demo-cert \
+  --set cn=demo.unikraft.dev. \
+  --set-file chain=cert.pem \
+  --set-file pkey=cert.key \
+  --set metro=fra
+```
+
+<Warning>
+Self-signed certificates will show security warnings in browsers. For production use, obtain certificates from a trusted Certificate Authority like Let's Encrypt.
+</Warning>
+
+## See Also
+
+- [services](/commands/services) - Manage service groups that use certificates
