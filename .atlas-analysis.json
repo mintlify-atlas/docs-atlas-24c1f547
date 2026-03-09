@@ -1,0 +1,119 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Unikraft CLI",
+  "projectDescription": "Command-line interface for deploying and managing unikernels globally on Unikraft Cloud.",
+  "theme": "aspen",
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#040404",
+  "darkColor": "#cecece",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/instances",
+              "core-concepts/volumes",
+              "core-concepts/services",
+              "core-concepts/certificates",
+              "core-concepts/images",
+              "core-concepts/metros"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/authentication",
+              "guides/profiles",
+              "guides/deploying-instances",
+              "guides/managing-volumes",
+              "guides/service-groups",
+              "guides/tls-certificates",
+              "guides/scale-to-zero",
+              "guides/output-formats"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/config-file",
+              "configuration/environment-variables",
+              "configuration/shell-completion"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Command Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "commands/login",
+              "commands/logout",
+              "commands/profile"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "commands/run"
+            ]
+          },
+          {
+            "group": "Resource Management",
+            "pages": [
+              "commands/instances",
+              "commands/volumes",
+              "commands/services",
+              "commands/certificates",
+              "commands/images",
+              "commands/metros"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "commands/completion"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Deploy unikernel instances globally in milliseconds",
+    "Multi-region deployment across metro locations",
+    "Full CRUD operations for instances, volumes, services, and certificates",
+    "Scale-to-zero support for cost optimization",
+    "Multiple output formats (JSON, table, key-value)",
+    "Profile management for multiple accounts",
+    "Shell completion for Bash, Zsh, Fish, and PowerShell",
+    "Volume management with cloning support",
+    "TLS certificate management",
+    "Service group configuration with automatic load balancing"
+  ],
+  "publicApiSurface": [
+    "unikraft login",
+    "unikraft logout",
+    "unikraft profile [list|get|use]",
+    "unikraft run",
+    "unikraft instances [list|get|create|edit|delete|logs|start|stop|restart]",
+    "unikraft volumes [list|get|create|edit|delete|clone]",
+    "unikraft services [list|get|create|edit|delete]",
+    "unikraft certificates [list|get|create|delete]",
+    "unikraft images [list|get|copy]",
+    "unikraft metros [list|get]",
+    "unikraft completion [bash|zsh|fish|powershell]"
+  ]
+}
